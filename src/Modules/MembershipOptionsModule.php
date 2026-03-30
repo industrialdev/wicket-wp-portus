@@ -25,10 +25,24 @@ class MembershipOptionsModule implements ConfigModuleInterface {
 		private readonly WordPressOptionReader $reader
 	) {}
 
+	/**
+	 * {@inheritdoc}
+	 *
+	 * @return string
+	 */
 	public function key(): string {
 		return 'memberships';
 	}
 
+	/**
+	 * Reads wicket_membership_plugin_options and wraps it under the
+	 * 'plugin_options' key so the manifest shape is explicit about what
+	 * this module owns vs. the CPT-backed records in MembershipConfigPostsModule.
+	 *
+	 * {@inheritdoc}
+	 *
+	 * @return array
+	 */
 	public function export(): array {
 		$value = $this->reader->get( self::OPTION_KEY, [] );
 
@@ -38,6 +52,11 @@ class MembershipOptionsModule implements ConfigModuleInterface {
 	}
 
 	/**
+	 * Checks that the payload contains a 'plugin_options' key and that its
+	 * value is an array. Both checks are hard errors because a missing or
+	 * malformed plugin_options would produce a broken import.
+	 *
+	 * @param array $payload
 	 * @return string[]
 	 */
 	public function validate( array $payload ): array {
@@ -55,6 +74,18 @@ class MembershipOptionsModule implements ConfigModuleInterface {
 		return $errors;
 	}
 
+	/**
+	 * Imports wicket_membership_plugin_options into this environment.
+	 *
+	 * Validates the payload structure first. Aborts on errors. In dry-run
+	 * mode, reports what would be written without touching the database.
+	 *
+	 * {@inheritdoc}
+	 *
+	 * @param array $payload
+	 * @param array $options
+	 * @return ImportResult
+	 */
 	public function import( array $payload, array $options = [] ): ImportResult {
 		$dry_run = $options['dry_run'] ?? true;
 

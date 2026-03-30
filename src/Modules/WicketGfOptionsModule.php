@@ -43,10 +43,26 @@ class WicketGfOptionsModule implements ConfigModuleInterface {
 		private readonly WordPressOptionReader $reader
 	) {}
 
+	/**
+	 * {@inheritdoc}
+	 *
+	 * @return string
+	 */
 	public function key(): string {
 		return 'gravity_forms_wicket_plugin';
 	}
 
+	/**
+	 * Reads all Wicket GF plugin options from the options table.
+	 *
+	 * JSON-encoded keys (wicket_gf_slug_mapping) are decoded so the manifest
+	 * stores a readable array rather than a raw JSON string. Plain keys are
+	 * returned as-is. Missing options are exported as null.
+	 *
+	 * {@inheritdoc}
+	 *
+	 * @return array
+	 */
 	public function export(): array {
 		$data = [];
 
@@ -68,6 +84,13 @@ class WicketGfOptionsModule implements ConfigModuleInterface {
 	}
 
 	/**
+	 * Checks that all expected option keys are present in the payload.
+	 *
+	 * Missing keys are returned as messages but treated as warnings (not hard
+	 * errors) during import — older sites may legitimately never have saved
+	 * some of these options, so absent keys are skipped rather than aborting.
+	 *
+	 * @param array $payload
 	 * @return string[]
 	 */
 	public function validate( array $payload ): array {
@@ -85,6 +108,19 @@ class WicketGfOptionsModule implements ConfigModuleInterface {
 		return $errors;
 	}
 
+	/**
+	 * Imports Wicket GF plugin options into this environment.
+	 *
+	 * Missing keys produce warnings (not errors) and are skipped. JSON-encoded
+	 * keys are re-encoded before writing so the GF plugin can read them correctly.
+	 * In dry-run mode, reports present/skipped keys without touching the database.
+	 *
+	 * {@inheritdoc}
+	 *
+	 * @param array $payload
+	 * @param array $options
+	 * @return ImportResult
+	 */
 	public function import( array $payload, array $options = [] ): ImportResult {
 		$dry_run = $options['dry_run'] ?? true;
 

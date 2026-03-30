@@ -27,10 +27,23 @@ class WicketSettingsModule implements ConfigModuleInterface {
 		private readonly WordPressOptionReader $reader
 	) {}
 
+	/**
+	 * {@inheritdoc}
+	 *
+	 * @return string
+	 */
 	public function key(): string {
 		return 'wicket_settings';
 	}
 
+	/**
+	 * Reads the full wicket_settings array from the options table.
+	 * Returns an empty array when the option has never been saved.
+	 *
+	 * {@inheritdoc}
+	 *
+	 * @return array
+	 */
 	public function export(): array {
 		$value = $this->reader->get( self::OPTION_KEY, [] );
 
@@ -38,6 +51,13 @@ class WicketSettingsModule implements ConfigModuleInterface {
 	}
 
 	/**
+	 * Checks that the payload is a non-empty array and that the two
+	 * environment-critical keys (API endpoint and API key) are present.
+	 *
+	 * Missing environment keys are returned as errors because importing a
+	 * wicket_settings without them would break the site's Wicket connection.
+	 *
+	 * @param array $payload
 	 * @return string[]
 	 */
 	public function validate( array $payload ): array {
@@ -65,6 +85,19 @@ class WicketSettingsModule implements ConfigModuleInterface {
 		return $errors;
 	}
 
+	/**
+	 * Imports wicket_settings into this environment.
+	 *
+	 * Always emits a sensitive-data warning because the option contains API
+	 * credentials. Validates the payload first and aborts on errors. In
+	 * dry-run mode, reports what would happen without writing anything.
+	 *
+	 * {@inheritdoc}
+	 *
+	 * @param array $payload
+	 * @param array $options
+	 * @return ImportResult
+	 */
 	public function import( array $payload, array $options = [] ): ImportResult {
 		$dry_run = $options['dry_run'] ?? true;
 
