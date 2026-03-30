@@ -8,7 +8,7 @@
  * Author:      Wicket Inc.
  * Author URI:  https://wicket.io
  * Text Domain: wicket-portus
- * Requires PHP: 8.2.
+ * Requires PHP: 8.3
  */
 
 declare(strict_types=1);
