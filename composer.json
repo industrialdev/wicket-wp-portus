@@ -1,8 +1,8 @@
 {
-  "name": "wicket/wicket-wp-portus",
+  "name": "industrialdev/wicket-wp-portus",
   "description": "Makes Wicket site configuration portable, reviewable, and repeatable.",
   "type": "wordpress-plugin",
-  "license": "proprietary",
+  "license": "GPL-2.0-or-later",
   "require": {
     "php": ">=8.3",
     "estebanforge/hyperfields": "^1"
