@@ -11,7 +11,6 @@ use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
 use WicketPortus\Modules\MembershipOptionsModule;
 use WicketPortus\Modules\PluginInventoryModule;
-use WicketPortus\Modules\ThemeAcfOptionsModule;
 use WicketPortus\Modules\WicketGfOptionsModule;
 use WicketPortus\Modules\WicketSettingsModule;
 use WicketPortus\Registry\ModuleRegistry;
@@ -24,6 +23,8 @@ use WicketPortus\Support\WordPressOptionReader;
  */
 class Plugin
 {
+    private const MODULE_SELECTION_KEY_PREFIX = '__portus_module__';
+
     private static ?Plugin $instance = null;
 
     private ModuleRegistry $registry;
@@ -149,11 +150,22 @@ class Plugin
         $export_mode = in_array($export_mode, ['template', 'full'], true) ? $export_mode : 'template';
 
         $options = $this->get_data_tools_options();
+        $option_groups = $this->get_data_tools_option_groups();
+        $selection_module_map = $this->get_export_selection_module_map();
 
-        $exporter = static function (array $selectedNames = [], string $prefix = '') use ($orchestrator, $export_mode): string {
-            unset($selectedNames, $prefix);
+        $exporter = static function (array $selectedNames = [], string $prefix = '') use ($orchestrator, $export_mode, $selection_module_map): string {
+            unset($prefix);
 
-                $manifest = $orchestrator->export([], $export_mode);
+                $selected_module_keys = [];
+                foreach ($selectedNames as $selected_name) {
+                    $selected_name = (string) $selected_name;
+                    if (isset($selection_module_map[$selected_name])) {
+                        $selected_module_keys[] = (string) $selection_module_map[$selected_name];
+                    }
+                }
+                $selected_module_keys = array_values(array_unique($selected_module_keys));
+
+                $manifest = $orchestrator->export($selected_module_keys, $export_mode);
                 $encoded  = wp_json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
                 return is_string($encoded) ? $encoded : '';
@@ -214,6 +226,7 @@ class Plugin
         $config = new ExportImportPageConfig(
             options: $options,
             allowedImportOptions: array_keys($options),
+            optionGroups: $option_groups,
             prefix: '',
             title: __('Portus Export / Import', 'wicket-portus'),
             description: __('Export and import Wicket-managed option groups. Review diffs before confirming import.', 'wicket-portus'),
@@ -256,7 +269,11 @@ class Plugin
         foreach ($this->registry->all() as $module) {
             if ($module instanceof OptionGroupProviderInterface) {
                 $options = array_merge($options, $module->option_groups());
+                continue;
             }
+
+            $selection_key = $this->module_selection_key($module->key());
+            $options[$selection_key] = $this->module_selection_label($module->key());
         }
 
         /**
@@ -267,6 +284,107 @@ class Plugin
         $options = apply_filters('wicket_portus_data_tools_options', $options);
 
         return is_array($options) ? $options : [];
+    }
+
+    /**
+     * Aggregates option key => module group labels for export UI filtering.
+     *
+     * @return array<string, string>
+     */
+    private function get_data_tools_option_groups(): array
+    {
+        $groups = [];
+
+        foreach ($this->registry->all() as $module) {
+            $module_group = $this->module_group_label($module->key());
+
+            if ($module instanceof OptionGroupProviderInterface) {
+                foreach ($module->option_groups() as $option_key => $_label) {
+                    $groups[(string) $option_key] = $module_group;
+                }
+                continue;
+            }
+
+            $groups[$this->module_selection_key($module->key())] = $module_group;
+        }
+
+        /**
+         * Allows extensions to adjust per-option group labels in the export UI.
+         *
+         * @param array<string, string> $groups option key => module group label
+         */
+        $groups = apply_filters('wicket_portus_data_tools_option_groups', $groups);
+
+        return is_array($groups) ? $groups : [];
+    }
+
+    /**
+     * Maps module keys to operator-friendly group labels in export UI.
+     *
+     * @param string $module_key
+     * @return string
+     */
+    private function module_group_label(string $module_key): string
+    {
+        return match ($module_key) {
+            'wicket_settings' => 'Wicket Base Plugin',
+            'memberships' => 'Wicket Memberships Plugin',
+            'gravity_forms_wicket_plugin' => 'Wicket Gravity Forms Plugin',
+            'account_centre' => 'Wicket Account Centre Plugin',
+            'theme_acf_options' => 'Wicket Theme ACF',
+            'site_inventory' => 'WordPress Plugin Inventory',
+            default => ucwords(str_replace('_', ' ', $module_key)),
+        };
+    }
+
+    /**
+     * Returns selection option key => module key map for export module resolution.
+     *
+     * @return array<string, string>
+     */
+    private function get_export_selection_module_map(): array
+    {
+        $map = [];
+
+        foreach ($this->registry->all() as $module) {
+            $module_key = $module->key();
+
+            if ($module instanceof OptionGroupProviderInterface) {
+                foreach (array_keys($module->option_groups()) as $option_key) {
+                    $map[(string) $option_key] = $module_key;
+                }
+                continue;
+            }
+
+            $map[$this->module_selection_key($module_key)] = $module_key;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Returns a synthetic UI selection key for module-level entries.
+     *
+     * @param string $module_key
+     * @return string
+     */
+    private function module_selection_key(string $module_key): string
+    {
+        return self::MODULE_SELECTION_KEY_PREFIX . $module_key;
+    }
+
+    /**
+     * Returns the UI label for synthetic module-level selector rows.
+     *
+     * @param string $module_key
+     * @return string
+     */
+    private function module_selection_label(string $module_key): string
+    {
+        return match ($module_key) {
+            'site_inventory' => 'Plugin Inventory (status + version checks)',
+            default => sprintf('%s (module)', $this->module_group_label($module_key)),
+        };
     }
 
     /**
@@ -284,7 +402,6 @@ class Plugin
         $this->registry->register(new MembershipOptionsModule($reader, $transfer));
         $this->registry->register(new WicketGfOptionsModule($reader, $transfer));
         $this->registry->register(new AccCarbonFieldsOptionsModule($reader, $transfer));
-        $this->registry->register(new ThemeAcfOptionsModule($reader, $transfer));
     }
 
     /**

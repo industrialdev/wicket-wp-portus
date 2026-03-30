@@ -131,6 +131,7 @@ class ExportImportUI
         return self::render(
             options:              $config->options,
             allowedImportOptions: $config->resolvedAllowedImportOptions(),
+            optionGroups:         $config->optionGroups,
             prefix:               $config->prefix,
             title:                $config->title,
             description:          $config->description,
@@ -206,6 +207,7 @@ class ExportImportUI
     public static function render(
         array $options = [],
         array $allowedImportOptions = [],
+        array $optionGroups = [],
         string $prefix = '',
         string $title = 'Data Export / Import',
         string $description = 'Export your settings to JSON or import a previously exported file.',
@@ -300,6 +302,7 @@ class ExportImportUI
             title:               $title,
             description:         $description,
             options:             $options,
+            optionGroups:        $optionGroups,
             prefix:              $prefix,
             exportJson:          $exportJson,
             exportError:         $exportError,
@@ -402,6 +405,138 @@ textarea.hf-json-codeblock {
 textarea.hf-json-codeblock:focus {
     border-color: #2563eb;
     box-shadow: 0 0 0 1px #2563eb;
+}
+.hf-json-copy-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 8px;
+}
+.hf-json-copy-button {
+    position: absolute;
+    top: 15px !important;
+    right: 12px !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    z-index: 2;
+    box-sizing: border-box;
+}
+.hf-json-copy-button .dashicons {
+    display: block;
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 18px !important;
+    line-height: 18px !important;
+    margin: 0 !important;
+}
+.hf-json-copy-button.is-copied {
+    border-color: #00a32a;
+    color: #00a32a;
+}
+.hf-export-options-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+.hf-export-group-dropdown,
+.hf-export-group-details {
+    flex: 0 1 auto;
+    margin-right: auto;
+}
+.hf-export-group-dropdown {
+    position: relative;
+    z-index: 20;
+}
+.hf-export-options-group-selector.card {
+    margin: 0;
+    min-width: 320px;
+    max-width: 560px;
+    flex: 1 1 420px;
+    padding: 12px 16px;
+}
+.hf-export-options-group-selector-label {
+    margin: 0 0 8px 0;
+}
+.hf-export-group-summary {
+    width: 100%;
+    min-width: 220px;
+    position: relative;
+    display: block;
+    text-align: left;
+    min-height: 0;
+    line-height: 1.4;
+    padding-left: 14px;
+    padding-right: 40px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+[data-hf-export-group-summary-label] {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 28px;
+    line-height: 1.4;
+}
+.hf-export-group-summary .dashicons {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+    line-height: 20px;
+    margin: 0;
+    transition: transform 120ms ease-in-out;
+}
+.hf-export-group-dropdown.is-open .hf-export-group-summary .dashicons {
+    transform: translateY(-50%) rotate(180deg);
+}
+.hf-export-group-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: auto;
+    width: 300px;
+    min-width: 220px;
+    max-width: 300px;
+    max-height: 280px;
+    overflow: auto;
+    border: 1px solid #dcdcde;
+    background: #fff;
+    border-radius: 4px;
+    padding: 8px 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+}
+.hf-export-group-panel[hidden] {
+    display: none;
+}
+.hf-export-group-option {
+    display: block;
+    margin: 6px 0;
+}
+.hf-export-options-toolbar-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+.hf-export-options-toolbar {
+    width: 100%;
 }
 CSS);
         }
@@ -520,6 +655,7 @@ CSS);
         string $title,
         string $description,
         array $options,
+        array $optionGroups,
         string $prefix,
         string $exportJson,
         string $exportError,
@@ -533,6 +669,15 @@ CSS);
     ): void {
         $hasDiff   = $previewTransientKey !== '' && !empty($incomingData);
         $cancelUrl = admin_url('admin.php?page=' . esc_attr(sanitize_text_field(wp_unslash($_GET['page'] ?? ''))));
+        $groupLabels = [];
+        foreach ($options as $optKey => $_optLabel) {
+            $groupLabel = (string) ($optionGroups[$optKey] ?? '');
+            if ($groupLabel !== '') {
+                $groupLabels[$groupLabel] = true;
+            }
+        }
+        $groupLabels = array_keys($groupLabels);
+        sort($groupLabels, SORT_NATURAL | SORT_FLAG_CASE);
         ?>
         <div class="wrap hyperpress hyperpress-options-wrap">
             <h1><?php echo esc_html($title); ?></h1>
@@ -545,6 +690,36 @@ CSS);
             <?php endif; ?>
 
             <?php if (!$hasDiff): ?>
+
+            <?php if ($exportJson): ?>
+
+            <!-- ====== EXPORT RESULT (JSON ONLY) ====== -->
+            <h2><?php esc_html_e('Exported JSON', 'hyperfields'); ?></h2>
+            <p><?php esc_html_e('Copy or download the exported JSON. Use "Back to selection" to run another export with different option groups.', 'hyperfields'); ?></p>
+
+            <div class="hyperpress-field-wrapper hf-json-copy-wrap">
+                <button type="button"
+                        class="button button-secondary hf-json-copy-button"
+                        data-hf-json-copy
+                        aria-label="<?php echo esc_attr__('Copy JSON to clipboard', 'hyperfields'); ?>"
+                        title="<?php echo esc_attr__('Copy JSON to clipboard', 'hyperfields'); ?>">
+                    <span class="dashicons dashicons-admin-page" aria-hidden="true"></span>
+                </button>
+                <textarea class="large-text code hf-json-codeblock" readonly rows="16"><?php echo esc_textarea($exportJson); ?></textarea>
+            </div>
+            <p>
+                <a href="data:application/json;charset=utf-8,<?php echo rawurlencode($exportJson); ?>"
+                   download="hyperfields-export-<?php echo esc_attr(gmdate('Y-m-d')); ?>.json"
+                   class="button button-primary">
+                    <?php esc_html_e('Download JSON', 'hyperfields'); ?>
+                </a>
+                <a href="<?php echo esc_url($cancelUrl); ?>"
+                   class="button button-secondary">
+                    <?php esc_html_e('Back to Selection', 'hyperfields'); ?>
+                </a>
+            </p>
+
+            <?php else: ?>
 
             <!-- ====== EXPORT SECTION ====== -->
             <h2><?php esc_html_e('Export', 'hyperfields'); ?></h2>
@@ -559,7 +734,32 @@ CSS);
                 <fieldset class="hf-export-options">
                     <legend class="screen-reader-text"><?php esc_html_e('Option groups', 'hyperfields'); ?></legend>
                     <div class="hf-export-options-toolbar">
-                        <div>
+                        <div class="hf-export-options-toolbar-row">
+                            <?php if (!empty($groupLabels)): ?>
+
+                                <div data-hf-export-group-selector class="hf-export-group-dropdown">
+                                    <button type="button"
+                                            data-hf-export-group-summary
+                                            class="button button-secondary hf-export-group-summary"
+                                            aria-expanded="false"
+                                            aria-controls="hf-export-group-panel">
+                                        <span data-hf-export-group-summary-label><?php esc_html_e('Select option groups', 'hyperfields'); ?></span>
+                                        <span class="dashicons dashicons-arrow-down-alt2" aria-hidden="true"></span>
+                                    </button>
+                                    <div id="hf-export-group-panel" data-hf-export-group-panel class="hf-export-group-panel" hidden>
+                                        <?php foreach ($groupLabels as $groupLabel): ?>
+                                            <label class="hf-export-group-option">
+                                                <input type="checkbox"
+                                                       data-hf-export-group-toggle
+                                                       value="<?php echo esc_attr($groupLabel); ?>">
+                                                <span><?php echo esc_html($groupLabel); ?></span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+
+                            <?php endif; ?>
+                            <div class="hf-export-options-toolbar-actions">
                             <button type="button" class="button button-secondary" data-hf-export-toggle="all">
                                 <?php esc_html_e('Check all', 'hyperfields'); ?>
                             </button>
@@ -569,6 +769,7 @@ CSS);
                             <button type="button" class="button button-secondary" data-hf-export-toggle="invert">
                                 <?php esc_html_e('Invert selection', 'hyperfields'); ?>
                             </button>
+                            </div>
                         </div>
                     </div>
                     <div class="hf-export-options-filter">
@@ -593,6 +794,7 @@ CSS);
                         <table class="widefat striped fixed hf-export-options-table">
                             <thead>
                                 <tr>
+                                    <th scope="col"><?php esc_html_e('Group', 'hyperfields'); ?></th>
                                     <th scope="col"><?php esc_html_e('Option Group', 'hyperfields'); ?></th>
                                     <th scope="col"><?php esc_html_e('Option Key', 'hyperfields'); ?></th>
                                     <th scope="col" class="hf-export-option-select-column">
@@ -602,7 +804,11 @@ CSS);
                             </thead>
                             <tbody>
                             <?php foreach ($options as $optKey => $optLabel): ?>
-                                <tr>
+                                <?php $groupLabel = (string) ($optionGroups[$optKey] ?? 'Other'); ?>
+                                <tr data-hf-export-group="<?php echo esc_attr($groupLabel); ?>">
+                                    <td>
+                                        <span><?php echo esc_html($groupLabel); ?></span>
+                                    </td>
                                     <th scope="row">
                                         <label for="hf_opt_<?php echo esc_attr($optKey); ?>">
                                             <?php echo esc_html($optLabel); ?>
@@ -615,8 +821,7 @@ CSS);
                                         <input type="checkbox"
                                                id="hf_opt_<?php echo esc_attr($optKey); ?>"
                                                name="hf_export_options[]"
-                                               value="<?php echo esc_attr($optKey); ?>"
-                                               checked>
+                                               value="<?php echo esc_attr($optKey); ?>">
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -636,20 +841,6 @@ CSS);
                     <span class="spinner"></span>
                 </p>
             </form>
-
-            <?php if ($exportJson): ?>
-                <h3><?php esc_html_e('Exported JSON', 'hyperfields'); ?></h3>
-                <div class="hyperpress-field-wrapper">
-                    <textarea class="large-text code hf-json-codeblock" readonly rows="12"><?php echo esc_textarea($exportJson); ?></textarea>
-                </div>
-                <p>
-                    <a href="data:application/json;charset=utf-8,<?php echo rawurlencode($exportJson); ?>"
-                       download="hyperfields-export-<?php echo esc_attr(gmdate('Y-m-d')); ?>.json"
-                       class="button">
-                        <?php esc_html_e('Download JSON', 'hyperfields'); ?>
-                    </a>
-                </p>
-            <?php endif; ?>
 
             <hr>
 
@@ -687,6 +878,8 @@ CSS);
                     </button>
                 </p>
             </form>
+
+            <?php endif; ?>
 
             <?php else: // Diff preview ?>
 
