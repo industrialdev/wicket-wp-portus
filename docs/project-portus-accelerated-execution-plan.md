@@ -1,5 +1,14 @@
 # Project Portus Accelerated Execution Plan
 
+## Status
+
+Historical planning artifact. Do not use this file as runtime behavior documentation.
+
+Current implementation reference:
+
+- `../README.md`
+- `./manifest-reference.md`
+
 ## Purpose
 
 This document extracts the accelerated lane into an execution-ready plan for three developers:

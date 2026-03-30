@@ -1,5 +1,14 @@
 # Project Portus Hack Week Plan
 
+## Status
+
+Historical planning artifact. Do not use this file as runtime behavior documentation.
+
+Current implementation reference:
+
+- `../README.md`
+- `./manifest-reference.md`
+
 ## Table of Contents
 
 ### Shared Between Both Lanes (Parent)

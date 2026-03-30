@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "280d9abdb975fff9245469485aa1e41a",
+    "content-hash": "7f7a8b2efb33a1a028925e01c58fe7a6",
     "packages": [
         {
             "name": "estebanforge/hyperfields",
