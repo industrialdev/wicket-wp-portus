@@ -345,6 +345,102 @@
         });
     }
 
+    function initExportModeControls() {
+        var fullGate = document.getElementById('hf-full-export-gate');
+        var developerGate = document.getElementById('hf-developer-export-gate');
+        var fullRadio = document.querySelector('input[name="hf_export_mode"][value="full"]');
+        var developerRadio = document.querySelector('input[name="hf_export_mode"][value="developer"]');
+        var templateRadio = document.querySelector('input[name="hf_export_mode"][value="template"]');
+        var sensitiveRadios = Array.prototype.slice.call(
+            document.querySelectorAll('input[data-hf-sensitive-export-toggle]')
+        );
+
+        if (!fullGate || !fullRadio || !developerRadio || !templateRadio || sensitiveRadios.length === 0) {
+            return;
+        }
+
+        var fullConfirmCheckbox = fullGate.querySelector('input[name="hf_full_export_confirm"]');
+        var developerConfirmCheckbox = developerGate
+            ? developerGate.querySelector('input[name="hf_developer_export_confirm"]')
+            : null;
+
+        var exportForm = fullGate.closest('form');
+        var exportButton = exportForm
+            ? exportForm.querySelector('button[name="hf_export_submit"]')
+            : null;
+
+        if (!fullConfirmCheckbox || !exportButton) {
+            return;
+        }
+
+        function resetSensitiveConfirmations() {
+            fullConfirmCheckbox.checked = false;
+            if (developerConfirmCheckbox) {
+                developerConfirmCheckbox.checked = false;
+            }
+        }
+
+        function updateExportButtonState() {
+            var templateSelected = !!templateRadio.checked;
+            var fullSelected = !!fullRadio.checked;
+            var developerSelected = !!developerRadio.checked;
+
+            if (templateSelected) {
+                exportButton.disabled = false;
+                exportButton.classList.remove('disabled');
+                return;
+            }
+
+            var fullConfirmed = !!fullConfirmCheckbox.checked;
+            var developerConfirmed = developerSelected
+                ? !!(developerConfirmCheckbox && developerConfirmCheckbox.checked)
+                : true;
+            var enabled = (fullSelected || developerSelected) && fullConfirmed && developerConfirmed;
+
+            exportButton.disabled = !enabled;
+            exportButton.classList.toggle('disabled', !enabled);
+        }
+
+        function updateGateState() {
+            var fullSelected = !!fullRadio.checked;
+            var developerSelected = !!developerRadio.checked;
+
+            fullGate.style.display = (fullSelected || developerSelected) ? 'block' : 'none';
+            if (developerGate) {
+                developerGate.style.display = developerSelected ? 'block' : 'none';
+            }
+
+            updateExportButtonState();
+        }
+
+        sensitiveRadios.forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                if (!radio.checked) {
+                    return;
+                }
+                resetSensitiveConfirmations();
+                updateGateState();
+            });
+        });
+
+        templateRadio.addEventListener('change', function () {
+            if (!templateRadio.checked) {
+                return;
+            }
+            updateGateState();
+        });
+
+        fullConfirmCheckbox.addEventListener('change', updateExportButtonState);
+        if (developerConfirmCheckbox) {
+            developerConfirmCheckbox.addEventListener('change', updateExportButtonState);
+        }
+
+        if (fullRadio.checked || developerRadio.checked) {
+            resetSensitiveConfirmations();
+        }
+        updateGateState();
+    }
+
     document.addEventListener('click', function (event) {
         var button = event.target.closest('[data-hf-export-toggle]');
         if (!button) {
@@ -381,8 +477,23 @@
         }
     });
 
+    document.addEventListener('click', function (event) {
+        var row = event.target.closest('.hf-export-options-table tbody tr');
+        if (!row) { return; }
+
+        var checkbox = row.querySelector('input[type="checkbox"][name="hf_export_options[]"]');
+        if (!checkbox) { return; }
+
+        // Let native checkbox clicks pass through untouched
+        if (event.target === checkbox) { return; }
+
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
         initJsonCopyButtons();
+        initExportModeControls();
 
         var exportGroups = Array.prototype.slice.call(document.querySelectorAll('.hf-export-options'));
         exportGroups.forEach(function (container) {
@@ -390,7 +501,7 @@
             initGroupSelector(container);
         });
 
-        var exportButton = document.querySelector('[name="hf_export_submit"], [name="portus_export_submit"]');
+        var exportButton = document.querySelector('[name="hf_export_submit"]');
         if (exportButton) {
             exportButton.closest('form').addEventListener('submit', function (event) {
                 var form = exportButton.closest('form');
@@ -400,7 +511,20 @@
 
                 removeExportValidationNotice(form);
 
-                if (!hasCheckedExportOptions(form)) {
+                var developerModeSelected = !!form.querySelector(
+                    'input[name="hf_export_mode"][value="developer"]:checked'
+                );
+
+                if (developerModeSelected && !hasCheckedExportOptions(form)) {
+                    var firstExportOption = form.querySelector(
+                        'input[type="checkbox"][name="hf_export_options[]"]'
+                    );
+                    if (firstExportOption) {
+                        firstExportOption.checked = true;
+                    }
+                }
+
+                if (!developerModeSelected && !hasCheckedExportOptions(form)) {
                     showExportValidationNotice(
                         form,
                         'Please select at least one option group before exporting.'

@@ -9,7 +9,9 @@ use HyperFields\Admin\ExportImportPageConfig;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
+use WicketPortus\Modules\DeveloperWpOptionsSnapshotModule;
 use WicketPortus\Modules\MembershipOptionsModule;
+use WicketPortus\Modules\PostTypeExportModule;
 use WicketPortus\Modules\PluginInventoryModule;
 use WicketPortus\Modules\WicketGfOptionsModule;
 use WicketPortus\Modules\WicketSettingsModule;
@@ -24,6 +26,9 @@ use WicketPortus\Support\WordPressOptionReader;
 class Plugin
 {
     private const MODULE_SELECTION_KEY_PREFIX = '__portus_module__';
+    private const DEVELOPER_ONLY_MODULE_KEYS = [
+        'developer_wp_options_snapshot',
+    ];
 
     private static ?Plugin $instance = null;
 
@@ -144,16 +149,17 @@ class Plugin
         $orchestrator = $this->orchestrator;
 
         // Read export mode from POST (template = default safer option).
-        $export_mode = isset($_POST['portus_export_mode'])
-            ? sanitize_text_field(wp_unslash($_POST['portus_export_mode']))
+        $export_mode = isset($_POST['hf_export_mode'])
+            ? sanitize_text_field(wp_unslash($_POST['hf_export_mode']))
             : 'template';
-        $export_mode = in_array($export_mode, ['template', 'full'], true) ? $export_mode : 'template';
+        $export_mode = in_array($export_mode, ['template', 'full', 'developer'], true) ? $export_mode : 'template';
 
         $options = $this->get_data_tools_options();
         $option_groups = $this->get_data_tools_option_groups();
         $selection_module_map = $this->get_export_selection_module_map();
+        $all_module_keys = $this->all_registered_module_keys();
 
-        $exporter = static function (array $selectedNames = [], string $prefix = '') use ($orchestrator, $export_mode, $selection_module_map): string {
+        $exporter = static function (array $selectedNames = [], string $prefix = '') use ($orchestrator, $export_mode, $selection_module_map, $all_module_keys): string {
             unset($prefix);
 
                 $selected_module_keys = [];
@@ -164,6 +170,10 @@ class Plugin
                     }
                 }
                 $selected_module_keys = array_values(array_unique($selected_module_keys));
+
+                if ($export_mode === 'developer') {
+                    $selected_module_keys = $all_module_keys;
+                }
 
                 $manifest = $orchestrator->export($selected_module_keys, $export_mode);
                 $encoded  = wp_json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -209,7 +219,7 @@ class Plugin
                 }
 
                 $incoming_mode = isset($decoded['export_mode']) ? (string) $decoded['export_mode'] : 'full';
-                $incoming_mode = in_array($incoming_mode, ['template', 'full'], true) ? $incoming_mode : 'full';
+                $incoming_mode = in_array($incoming_mode, ['template', 'full', 'developer'], true) ? $incoming_mode : 'full';
 
                 // current = what the orchestrator would export for the same module set (for diff display).
                 $current  = $orchestrator->export($module_keys, $incoming_mode);
@@ -301,6 +311,10 @@ class Plugin
         $options = [];
 
         foreach ($this->registry->all() as $module) {
+            if ($this->is_developer_only_module($module->key())) {
+                continue;
+            }
+
             if ($module instanceof OptionGroupProviderInterface) {
                 $options = array_merge($options, $module->option_groups());
                 continue;
@@ -330,6 +344,10 @@ class Plugin
         $groups = [];
 
         foreach ($this->registry->all() as $module) {
+            if ($this->is_developer_only_module($module->key())) {
+                continue;
+            }
+
             $module_group = $this->module_group_label($module->key());
 
             if ($module instanceof OptionGroupProviderInterface) {
@@ -365,8 +383,11 @@ class Plugin
             'memberships' => 'Wicket Memberships Plugin',
             'gravity_forms_wicket_plugin' => 'Wicket Gravity Forms Plugin',
             'account_centre' => 'Wicket Account Centre Plugin',
-            'theme_acf_options' => 'Wicket Theme ACF',
-            'site_inventory' => 'WordPress Plugin Inventory',
+            'site_inventory' => 'Plugin Inventory',
+            'content_pages' => 'Content: Pages',
+            'content_my_account' => 'Content: My Account',
+            'content_wicket_mship_config' => 'Content: Membership Config',
+            'developer_wp_options_snapshot' => 'Developer: Full wp_options Snapshot',
             default => ucwords(str_replace('_', ' ', $module_key)),
         };
     }
@@ -382,6 +403,10 @@ class Plugin
 
         foreach ($this->registry->all() as $module) {
             $module_key = $module->key();
+
+            if ($this->is_developer_only_module($module_key)) {
+                continue;
+            }
 
             if ($module instanceof OptionGroupProviderInterface) {
                 foreach (array_keys($module->option_groups()) as $option_key) {
@@ -417,8 +442,32 @@ class Plugin
     {
         return match ($module_key) {
             'site_inventory' => 'Plugin Inventory (status + version checks)',
+            'content_pages' => 'Pages (post type: page)',
+            'content_my_account' => 'My Account (post type: my-account)',
+            'content_wicket_mship_config' => 'Membership Config (post type: wicket_mship_config)',
             default => sprintf('%s (module)', $this->module_group_label($module_key)),
         };
+    }
+
+    /**
+     * Returns all registered module keys, including developer-only modules.
+     *
+     * @return string[]
+     */
+    private function all_registered_module_keys(): array
+    {
+        return array_values(array_map('strval', array_keys($this->registry->all())));
+    }
+
+    /**
+     * Returns true when a module is intended for developer-mode exports only.
+     *
+     * @param string $module_key
+     * @return bool
+     */
+    private function is_developer_only_module(string $module_key): bool
+    {
+        return in_array($module_key, self::DEVELOPER_ONLY_MODULE_KEYS, true);
     }
 
     /**
@@ -432,6 +481,10 @@ class Plugin
         $transfer = new HyperfieldsOptionTransfer();
 
         $this->registry->register(new PluginInventoryModule());
+        $this->registry->register(new DeveloperWpOptionsSnapshotModule());
+        $this->registry->register(new PostTypeExportModule('content_pages', 'page'));
+        $this->registry->register(new PostTypeExportModule('content_my_account', 'my-account'));
+        $this->registry->register(new PostTypeExportModule('content_wicket_mship_config', 'wicket_mship_config'));
         $this->registry->register(new WicketSettingsModule($reader, $transfer));
         $this->registry->register(new MembershipOptionsModule($reader, $transfer));
         $this->registry->register(new WicketGfOptionsModule($reader, $transfer));
@@ -448,8 +501,8 @@ class Plugin
      */
     private function build_export_mode_controls(): string
     {
-        $current_mode = isset($_POST['portus_export_mode'])
-            ? sanitize_text_field(wp_unslash($_POST['portus_export_mode']))
+        $current_mode = isset($_POST['hf_export_mode'])
+            ? sanitize_text_field(wp_unslash($_POST['hf_export_mode']))
             : 'template';
 
         ob_start();
@@ -460,11 +513,21 @@ class Plugin
                 <?php esc_html_e('Choose how sensitive data should be handled in this export.', 'wicket-portus'); ?>
             </p>
 
-            <fieldset>
+            <style>
+            #hf-export-mode-controls input[name="hf_export_mode"][value="developer"]:checked ~ #hf-developer-export-gate {
+                display: block !important;
+            }
+            #hf-export-mode-controls input[name="hf_export_mode"][value="full"]:checked ~ #hf-full-export-gate,
+            #hf-export-mode-controls input[name="hf_export_mode"][value="developer"]:checked ~ #hf-full-export-gate {
+                display: block !important;
+            }
+            </style>
+
+            <fieldset id="hf-export-mode-controls">
                 <legend class="screen-reader-text"><?php esc_html_e('Export mode selection', 'wicket-portus'); ?></legend>
 
                 <label style="display: block; margin-bottom: 10px;">
-                    <input type="radio" name="portus_export_mode" value="template"
+                    <input type="radio" name="hf_export_mode" value="template"
                         <?php checked($current_mode, 'template'); ?>
                         <?php checked($current_mode, ''); // Default to template if not set ?>>
                     <strong><?php esc_html_e('Template (Safe for New Clients)', 'wicket-portus'); ?></strong>
@@ -475,9 +538,9 @@ class Plugin
                 </label>
 
                 <label style="display: block; margin-bottom: 10px;">
-                    <input type="radio" name="portus_export_mode" value="full"
+                    <input type="radio" name="hf_export_mode" value="full"
                         <?php checked($current_mode, 'full'); ?>
-                        data-portus-full-export-toggle>
+                        data-hf-sensitive-export-toggle>
                     <strong style="color: #d63638;"><?php esc_html_e('Full Export (Includes Credentials)', 'wicket-portus'); ?></strong>
                     <br>
                     <span class="description">
@@ -485,7 +548,30 @@ class Plugin
                     </span>
                 </label>
 
-                <div id="portus-full-export-gate" class="portus-full-export-confirmation" style="margin-top: 15px; padding: 12px; border-left: 4px solid #d63638; background: #fff5f5; display: <?php echo $current_mode === 'full' ? 'block' : 'none'; ?>;">
+                <label style="display: block; margin-bottom: 10px;">
+                    <input type="radio" name="hf_export_mode" value="developer"
+                        <?php checked($current_mode, 'developer'); ?>
+                        data-hf-sensitive-export-toggle>
+                    <strong style="color: #b32d2e;"><?php esc_html_e('Developer Full Export (Full + wp_options Snapshot)', 'wicket-portus'); ?></strong>
+                    <br>
+                    <span class="description">
+                        <?php esc_html_e('Developer-focused export of all registered Portus modules plus a full wp_options table snapshot for diagnostics and migration analysis.', 'wicket-portus'); ?>
+                    </span>
+                </label>
+
+                <div id="hf-developer-export-gate" style="margin-top: 10px; margin-bottom: 12px; padding: 12px; border-left: 4px solid #8a2424; background: #fff8f8; display: <?php echo $current_mode === 'developer' ? 'block' : 'none'; ?>;">
+                    <p style="margin: 0 0 8px 0; color: #8a2424;">
+                        <strong><?php esc_html_e('Developer export includes all configured Portus modules plus full wp_options data.', 'wicket-portus'); ?></strong>
+                    </p>
+                    <label style="display: block; margin-top: 8px;">
+                        <input type="checkbox" name="hf_developer_export_confirm" value="1">
+                        <span style="font-weight: 600;">
+                            <?php esc_html_e('I understand this will export all available data, including developer-level snapshots.', 'wicket-portus'); ?>
+                        </span>
+                    </label>
+                </div>
+
+                <div id="hf-full-export-gate" style="margin-top: 15px; padding: 12px; border-left: 4px solid #d63638; background: #fff5f5; display: <?php echo in_array($current_mode, ['full', 'developer'], true) ? 'block' : 'none'; ?>;">
                     <p style="margin: 0 0 8px 0; color: #d63638;">
                         <strong><?php esc_html_e('⚠️ Warning: This export contains sensitive data.', 'wicket-portus'); ?></strong>
                     </p>
@@ -493,7 +579,7 @@ class Plugin
                         <?php esc_html_e('API keys, authentication tokens, and environment URLs will be included. Do not share this file outside your organisation or via insecure channels.', 'wicket-portus'); ?>
                     </p>
                     <label style="display: block; margin-top: 8px;">
-                        <input type="checkbox" name="portus_full_export_confirm" value="1">
+                        <input type="checkbox" name="hf_full_export_confirm" value="1">
                         <span style="font-weight: 600;">
                             <?php esc_html_e('I understand this file contains sensitive credentials and I will handle it securely.', 'wicket-portus'); ?>
                         </span>
@@ -502,53 +588,6 @@ class Plugin
             </fieldset>
         </div>
 
-        <script>
-        (function () {
-            var fullRadio = document.querySelector('input[data-portus-full-export-toggle]');
-            var gate = document.getElementById('portus-full-export-gate');
-            var confirmation = gate ? gate.querySelector('.portus-full-export-confirmation') : null;
-            var confirmCheckbox = confirmation ? confirmation.querySelector('input[type="checkbox"]') : null;
-            var exportForm = gate ? gate.closest('form') : null;
-            var exportButton = exportForm ? exportForm.querySelector('button[name="hf_export_submit"]') : null;
-
-            if (!fullRadio || !gate || !confirmation || !confirmCheckbox || !exportForm || !exportButton) {
-                return;
-            }
-
-            // Toggle confirmation visibility when Full is selected.
-            fullRadio.addEventListener('change', function () {
-                if (this.checked) {
-                    gate.style.display = 'block';
-                    confirmation.style.display = 'block';
-                    confirmCheckbox.checked = false;
-                    if (exportButton) {
-                        exportButton.disabled = true;
-                        exportButton.classList.add('disabled');
-                    }
-                }
-            });
-
-            // Re-enable export button only when checkbox is checked.
-            if (confirmCheckbox) {
-                confirmCheckbox.addEventListener('change', function () {
-                    if (exportButton) {
-                        exportButton.disabled = !this.checked;
-                        exportButton.classList.toggle('disabled', !this.checked);
-                    }
-                });
-            }
-
-            // Initial state: if full is pre-selected (e.g. form submission error), show confirmation.
-            if (fullRadio.checked) {
-                gate.style.display = 'block';
-                confirmation.style.display = 'block';
-                if (exportButton && !confirmCheckbox.checked) {
-                    exportButton.disabled = true;
-                    exportButton.classList.add('disabled');
-                }
-            }
-        })();
-        </script>
         <?php
         return (string) ob_get_clean();
     }

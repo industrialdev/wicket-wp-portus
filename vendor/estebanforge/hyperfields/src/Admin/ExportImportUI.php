@@ -323,75 +323,14 @@ class ExportImportUI
     // -------------------------------------------------------------------------
 
     /**
-     * Enqueue jsondiffpatch CSS and JS via the WordPress asset pipeline.
+     * Enqueue shared UI styles via the WordPress asset pipeline.
      *
      * Always safe to call — wp_enqueue_* deduplicates automatically.
      */
     private static function enqueueDiffAssets(): void
     {
-        wp_enqueue_style(
-            'jsondiffpatch',
-            'https://cdn.jsdelivr.net/npm/jsondiffpatch/lib/formatters/styles/html.min.css',
-            [],
-            null
-        );
         if (function_exists('wp_add_inline_style')) {
-            wp_add_inline_style('jsondiffpatch', <<<CSS
-#hf-diff-container.hf-diff-codeblock {
-    background: #0f172a;
-    border: 1px solid #1f2937;
-    border-radius: 8px;
-    color: #e5e7eb;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 14px;
-    line-height: 1.45;
-    padding: 16px;
-}
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-delta {
-    color: #e5e7eb;
-}
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-property-name {
-    color: #d1d5db;
-}
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-added .jsondiffpatch-property-name,
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-modified .jsondiffpatch-right-value pre {
-    background: #0f3d24 !important;
-    background-color: #0f3d24 !important;
-    color: #ecfdf5 !important;
-    border-radius: 3px;
-    font-weight: 600;
-    text-shadow: none;
-}
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-deleted .jsondiffpatch-property-name,
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-modified .jsondiffpatch-left-value pre {
-    background: #5f1116 !important;
-    background-color: #5f1116 !important;
-    color: #fff1f2 !important;
-    border-radius: 3px;
-    font-weight: 600;
-    text-shadow: none;
-}
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-added .jsondiffpatch-value pre,
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-added pre,
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-textdiff-added {
-    background: #0f3d24 !important;
-    background-color: #0f3d24 !important;
-    color: #ecfdf5 !important;
-    border-radius: 3px;
-    text-shadow: none;
-}
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-deleted .jsondiffpatch-value pre,
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-deleted pre,
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-textdiff-deleted {
-    background: #5f1116 !important;
-    background-color: #5f1116 !important;
-    color: #fff1f2 !important;
-    border-radius: 3px;
-    text-shadow: none;
-}
-#hf-diff-container.hf-diff-codeblock .jsondiffpatch-value pre {
-    color: #e5e7eb;
-}
+            wp_add_inline_style('hyperpress-admin', <<<CSS
 textarea.hf-json-codeblock {
     background: #0f172a;
     border: 1px solid #1f2937;
@@ -412,30 +351,6 @@ textarea.hf-json-codeblock:focus {
     width: 100%;
     overflow: hidden;
     border-radius: 8px;
-}
-.hf-json-copy-button {
-    position: absolute;
-    top: 15px !important;
-    right: 12px !important;
-    width: 32px !important;
-    height: 32px !important;
-    min-width: 32px !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    z-index: 2;
-    box-sizing: border-box;
-}
-.hf-json-copy-button .dashicons {
-    display: block;
-    width: 18px !important;
-    height: 18px !important;
-    font-size: 18px !important;
-    line-height: 18px !important;
-    margin: 0 !important;
 }
 .hf-json-copy-button.is-copied {
     border-color: #00a32a;
@@ -538,16 +453,22 @@ textarea.hf-json-codeblock:focus {
 .hf-export-options-toolbar {
     width: 100%;
 }
+.hf-export-options-table tbody tr {
+    cursor: pointer;
+}
+/* Import diff — diff2html overrides */
+#hf-diff-container .d2h-file-collapse,
+#hf-diff-container .d2h-moved-tag {
+    display: none !important;
+}
+#hf-diff-container .d2h-file-wrapper {
+    margin: 0 !important;
+}
+body .hyperpress-options-wrap.hf-diff-view {
+    max-width: none;
+}
 CSS);
         }
-
-        // Load ESM entrypoint as a module (WP 6.5+).
-        wp_enqueue_script_module(
-            'jsondiffpatch',
-            'https://cdn.jsdelivr.net/npm/jsondiffpatch/+esm',
-            [],
-            null
-        );
     }
 
     /**
@@ -667,8 +588,8 @@ CSS);
         bool $importSuccess,
         ?string $exportFormExtras = null,
     ): void {
-        $hasDiff   = $previewTransientKey !== '' && !empty($incomingData);
-        $cancelUrl = admin_url('admin.php?page=' . esc_attr(sanitize_text_field(wp_unslash($_GET['page'] ?? ''))));
+        $hasDiff = $previewTransientKey !== '' && !empty($incomingData);
+        $cancelUrl  = admin_url('admin.php?page=' . esc_attr(sanitize_text_field(wp_unslash($_GET['page'] ?? ''))));
         $groupLabels = [];
         foreach ($options as $optKey => $_optLabel) {
             $groupLabel = (string) ($optionGroups[$optKey] ?? '');
@@ -679,7 +600,7 @@ CSS);
         $groupLabels = array_keys($groupLabels);
         sort($groupLabels, SORT_NATURAL | SORT_FLAG_CASE);
         ?>
-        <div class="wrap hyperpress hyperpress-options-wrap">
+        <div class="wrap hyperpress hyperpress-options-wrap<?php echo $hasDiff ? ' hf-diff-view' : ''; ?>">
             <h1><?php echo esc_html($title); ?></h1>
             <p><?php echo esc_html($description); ?></p>
 
@@ -697,17 +618,23 @@ CSS);
             <h2><?php esc_html_e('Exported JSON', 'hyperfields'); ?></h2>
             <p><?php esc_html_e('Copy or download the exported JSON. Use "Back to selection" to run another export with different option groups.', 'hyperfields'); ?></p>
 
-            <div class="hyperpress-field-wrapper hf-json-copy-wrap">
+            <div style="display:flex;justify-content:flex-end;width:100%;margin-bottom:6px;">
                 <button type="button"
-                        class="button button-secondary hf-json-copy-button"
-                        data-hf-json-copy
+                        id="hf-json-copy-btn"
+                        class="button button-secondary"
+                        style="display:inline-flex;align-items:center;gap:4px;"
                         aria-label="<?php echo esc_attr__('Copy JSON to clipboard', 'hyperfields'); ?>"
                         title="<?php echo esc_attr__('Copy JSON to clipboard', 'hyperfields'); ?>">
-                    <span class="dashicons dashicons-admin-page" aria-hidden="true"></span>
+                    <span class="dashicons dashicons-admin-page" style="margin:0;" aria-hidden="true"></span>
+                    <?php esc_html_e('Copy JSON', 'hyperfields'); ?>
                 </button>
-                <textarea class="large-text code hf-json-codeblock" readonly rows="16"><?php echo esc_textarea($exportJson); ?></textarea>
             </div>
-            <p>
+            <div id="hf-json-viewer" style="border:1px solid #1f2937;border-radius:8px;overflow:auto;max-height:700px;background:#0f172a;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono',monospace;font-size:13px;"></div>
+
+            <!-- Raw JSON kept hidden so the download link and copy still work -->
+            <textarea id="hf-json-raw" style="display:none;" aria-hidden="true"><?php echo esc_textarea($exportJson); ?></textarea>
+
+            <p style="margin-top:12px;">
                 <a href="data:application/json;charset=utf-8,<?php echo rawurlencode($exportJson); ?>"
                    download="hyperfields-export-<?php echo esc_attr(gmdate('Y-m-d')); ?>.json"
                    class="button button-primary">
@@ -718,6 +645,78 @@ CSS);
                     <?php esc_html_e('Back to Selection', 'hyperfields'); ?>
                 </a>
             </p>
+
+            <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var raw     = document.getElementById('hf-json-raw');
+                var viewer  = document.getElementById('hf-json-viewer');
+                var copyBtn = document.getElementById('hf-json-copy-btn');
+                if (!raw || !viewer) { return; }
+
+                if (copyBtn) {
+                    var copyIcon = copyBtn.querySelector('.dashicons');
+                    var copyLabel = '<?php echo esc_js(__('Copy JSON', 'hyperfields')); ?>';
+                    var copiedLabel = '<?php echo esc_js(__('Copied!', 'hyperfields')); ?>';
+                    var errorLabel = '<?php echo esc_js(__('Failed', 'hyperfields')); ?>';
+
+                    function setCopyState(state) {
+                        copyBtn.classList.remove('is-copied');
+                        if (copyIcon) {
+                            copyIcon.classList.remove('dashicons-admin-page', 'dashicons-yes-alt', 'dashicons-warning');
+                        }
+                        if (state === 'copied') {
+                            copyBtn.classList.add('is-copied');
+                            if (copyIcon) { copyIcon.classList.add('dashicons-yes-alt'); }
+                            copyBtn.lastChild.textContent = ' ' + copiedLabel;
+                        } else if (state === 'error') {
+                            if (copyIcon) { copyIcon.classList.add('dashicons-warning'); }
+                            copyBtn.lastChild.textContent = ' ' + errorLabel;
+                        } else {
+                            if (copyIcon) { copyIcon.classList.add('dashicons-admin-page'); }
+                            copyBtn.lastChild.textContent = ' ' + copyLabel;
+                        }
+                    }
+
+                    copyBtn.addEventListener('click', function () {
+                        navigator.clipboard.writeText(raw.value).then(function () {
+                            setCopyState('copied');
+                            setTimeout(function () { setCopyState('idle'); }, 1500);
+                        }).catch(function () {
+                            setCopyState('error');
+                            setTimeout(function () { setCopyState('idle'); }, 1800);
+                        });
+                    });
+                }
+
+                function initViewer() {
+                    try {
+                        var data = JSON.parse(raw.value);
+                        viewer.innerHTML = '';
+                        new JsonViewer({
+                            value:           data,
+                            theme:           'dark',
+                            defaultInspectDepth: 2,
+                            enableClipboard: false,
+                        }).render(viewer);
+                    } catch (e) {
+                        viewer.innerHTML = '<pre style="color:#e5e7eb;margin:0;">' + raw.value.replace(/</g, '&lt;') + '</pre>';
+                        console.error('hf-json-viewer error', e);
+                    }
+                }
+
+                if (typeof JsonViewer !== 'undefined') {
+                    initViewer();
+                } else {
+                    var s    = document.createElement('script');
+                    s.src    = 'https://cdn.jsdelivr.net/npm/@textea/json-viewer@3';
+                    s.onload = initViewer;
+                    s.onerror = function () {
+                        viewer.innerHTML = '<pre style="color:#e5e7eb;margin:0;">' + raw.value.replace(/</g, '&lt;') + '</pre>';
+                    };
+                    document.head.appendChild(s);
+                }
+            });
+            </script>
 
             <?php else: ?>
 
@@ -845,7 +844,7 @@ CSS);
             <hr>
 
             <!-- ====== IMPORT SECTION ====== -->
-            <h2><?php esc_html_e('Import', 'hyperfields'); ?></h2>
+            <h2><?php esc_html_e('View Diff. / Import', 'hyperfields'); ?></h2>
             <p><?php esc_html_e('Upload a previously exported JSON file. You will be shown a preview of what will change before confirming.', 'hyperfields'); ?></p>
 
             <?php if ($previewError): ?>
@@ -881,24 +880,42 @@ CSS);
 
             <?php endif; ?>
 
-            <?php else: // Diff preview ?>
+            <?php else: // Import diff preview ?>
 
             <!-- ====== DIFF PREVIEW SECTION ====== -->
             <h2><?php esc_html_e('Import Preview', 'hyperfields'); ?></h2>
             <p><?php esc_html_e('Review the changes below. Keys highlighted in green will be added or updated; keys in red will be removed.', 'hyperfields'); ?></p>
             <p><em><?php esc_html_e('Current settings are shown on the left; imported values are on the right.', 'hyperfields'); ?></em></p>
 
-            <div class="hyperpress-field-wrapper">
-                <div id="hf-diff-container" class="hyperpress-field-input-wrapper hf-diff-codeblock" style="overflow:auto;max-height:600px;">
-                    <p><?php esc_html_e('Loading diff…', 'hyperfields'); ?></p>
-                </div>
+            <div id="hf-diff-container" style="overflow:auto;max-height:900px;border:1px solid #1f2937;border-radius:8px;">
+                <p style="padding:16px;"><?php esc_html_e('Loading diff…', 'hyperfields'); ?></p>
             </div>
 
             <form method="post">
                 <?php wp_nonce_field('hf_confirm_action', 'hf_confirm_nonce'); ?>
                 <input type="hidden" name="hf_transient_key" value="<?php echo esc_attr($previewTransientKey); ?>">
+                <div style="margin-top:15px;padding:12px;border-left:4px solid #d63638;background:#fff5f5;">
+                    <p style="margin:0 0 8px 0;color:#d63638;">
+                        <strong><?php esc_html_e('⚠️ Warning: This action is destructive.', 'hyperfields'); ?></strong>
+                    </p>
+                    <p style="margin:0 0 12px 0;" class="description">
+                        <?php esc_html_e('Performing an import will overwrite existing settings with the values from the uploaded file. This cannot be undone.', 'hyperfields'); ?>
+                    </p>
+                    <label style="display:block;margin-top:8px;cursor:pointer;">
+                        <input type="checkbox"
+                               id="hf_import_confirm_destructive"
+                               onchange="document.getElementById('hf_confirm_submit_btn').disabled=!this.checked;">
+                        <span style="font-weight:600;">
+                            <?php esc_html_e('I understand performing an import will overwrite existing settings and cannot be undone.', 'hyperfields'); ?>
+                        </span>
+                    </label>
+                </div>
                 <p class="submit">
-                    <button type="submit" name="hf_confirm_submit" class="button button-primary">
+                    <button type="submit"
+                            id="hf_confirm_submit_btn"
+                            name="hf_confirm_submit"
+                            class="button button-primary"
+                            disabled>
                         <?php esc_html_e('Confirm Import', 'hyperfields'); ?>
                     </button>
                     <a href="<?php echo esc_url($cancelUrl); ?>"
@@ -909,30 +926,83 @@ CSS);
             </form>
 
             <script>
-            (async function () {
+            (function () {
                 var current   = <?php echo wp_json_encode($currentSnapshot, JSON_HEX_TAG | JSON_HEX_AMP); ?>;
                 var incoming  = <?php echo wp_json_encode($incomingData, JSON_HEX_TAG | JSON_HEX_AMP); ?>;
                 var container = document.getElementById('hf-diff-container');
-                var moduleUrl = 'https://cdn.jsdelivr.net/npm/jsondiffpatch/+esm';
-                var formatterUrl = 'https://cdn.jsdelivr.net/npm/jsondiffpatch/formatters/html/+esm';
-
                 if (!container) { return; }
 
-                try {
-                    var mod = await import(moduleUrl);
-                    var fmt = await import(formatterUrl);
-                    var delta = mod.diff(current, incoming);
-                    if (!delta) {
-                        container.innerHTML = '<p><strong><?php echo esc_js(__('No differences found. The uploaded file matches the current settings.', 'hyperfields')); ?></strong></p>';
-                        return;
-                    }
-                    container.innerHTML = '';
-                    var diffHtml = fmt.format(delta, current);
-                    container.innerHTML = diffHtml;
-                } catch (e) {
-                    container.innerHTML = '<p><?php echo esc_js(__('Could not load or render diff. Please check the browser console for details.', 'hyperfields')); ?></p>';
-                    console.error('jsondiffpatch error', e);
+                var noChange = '<p style="padding:16px;"><strong><?php echo esc_js(__('No differences found. The uploaded file matches the current settings.', 'hyperfields')); ?></strong></p>';
+                var errMsg   = '<p style="padding:16px;"><?php echo esc_js(__('Could not load or render diff. Please check the browser console for details.', 'hyperfields')); ?></p>';
+
+                function loadScript(src, id, cb) {
+                    if (document.getElementById(id)) { cb(); return; }
+                    var s  = document.createElement('script');
+                    s.id   = id;
+                    s.src  = src;
+                    s.onload  = cb;
+                    s.onerror = function () { container.innerHTML = errMsg; console.error('hf-diff: failed to load ' + src); };
+                    document.head.appendChild(s);
                 }
+
+                function loadCss(href, id) {
+                    if (document.getElementById(id)) { return; }
+                    var l  = document.createElement('link');
+                    l.id   = id;
+                    l.rel  = 'stylesheet';
+                    l.href = href;
+                    document.head.appendChild(l);
+                }
+
+                function render() {
+                    try {
+                        var leftStr  = JSON.stringify(current,  null, 2);
+                        var rightStr = JSON.stringify(incoming, null, 2);
+
+                        var unifiedDiff = Diff.createTwoFilesPatch(
+                            'current', 'incoming',
+                            leftStr, rightStr,
+                            '', '',
+                            { context: 4 }
+                        );
+
+                        if (unifiedDiff.split('\n').slice(2).every(function (l) { return l[0] !== '+' && l[0] !== '-'; })) {
+                            container.innerHTML = noChange;
+                            return;
+                        }
+
+                        loadCss('https://cdn.jsdelivr.net/npm/diff2html@3.4.56/bundles/css/diff2html.min.css', 'hf-diff2html-css');
+                        loadCss('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css', 'hf-hljs-css');
+
+                        var ui = new Diff2HtmlUI(container, unifiedDiff, {
+                            drawFileList:       false,
+                            matching:           'lines',
+                            outputFormat:       'side-by-side',
+                            diffStyle:          'char',
+                            colorScheme:        'dark',
+                            synchronisedScroll: true,
+                            highlight:          true,
+                        });
+                        ui.draw();
+                        ui.highlightCode();
+                        ui.synchronisedScroll();
+                    } catch (e) {
+                        container.innerHTML = errMsg;
+                        console.error('hf-diff error', e);
+                    }
+                }
+
+                loadScript(
+                    'https://cdn.jsdelivr.net/npm/diff@7/dist/diff.min.js',
+                    'hf-diff-js',
+                    function () {
+                        loadScript(
+                            'https://cdn.jsdelivr.net/npm/diff2html@3.4.56/bundles/js/diff2html-ui.min.js',
+                            'hf-diff2html-ui-js',
+                            render
+                        );
+                    }
+                );
             })();
             </script>
 
