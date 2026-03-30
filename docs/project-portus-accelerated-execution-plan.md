@@ -79,8 +79,8 @@ Priority order:
 
 ### Shared Contract Lock (Required Before Coding Continues)
 
-- [ ] Lock manifest v1 keys and schema version.
-- [ ] Lock module IDs and ownership boundaries.
+- [x] Lock manifest v1 keys and schema version.
+- [x] Lock module IDs and ownership boundaries.
 - [ ] Lock import matching rule: slug-first, ID reference-only.
 - [ ] Lock de-scope order and checkpoint criteria.
 
@@ -184,8 +184,8 @@ If checkpoint fails:
 - [ ] Export reliable for all must-ship option-backed modules.
 - [ ] Validate/dry-run reliable and understandable.
 - [ ] Import reliable for must-ship option-backed modules.
-- [ ] Plugin inventory warnings reliable.
-- [ ] Sensitive-data warnings present and unmissable.
+- [x] Plugin inventory warnings reliable.
+- [x] Sensitive-data warnings present and unmissable.
 - [ ] Stretch items either stable and shipped, or clearly cut and documented.
 
 ## Thursday: Polish and Demo Readiness
