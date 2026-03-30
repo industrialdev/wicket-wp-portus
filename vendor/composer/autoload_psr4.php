@@ -7,4 +7,5 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'WicketPortus\\' => array($baseDir . '/src'),
+    'HyperFields\\' => array($vendorDir . '/estebanforge/hyperfields/src'),
 );

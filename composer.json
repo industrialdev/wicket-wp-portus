@@ -4,7 +4,8 @@
   "type": "wordpress-plugin",
   "license": "proprietary",
   "require": {
-    "php": ">=8.2"
+    "php": ">=8.3",
+    "estebanforge/hyperfields": "^1"
   },
   "autoload": {
     "psr-4": {
