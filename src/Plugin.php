@@ -5,19 +5,21 @@ declare(strict_types=1);
 namespace WicketPortus;
 
 use HyperFields\Admin\ExportImportUI;
+use WicketPortus\Contracts\OptionGroupProviderInterface;
+use WicketPortus\Manifest\TransferOrchestrator;
+use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
 use WicketPortus\Modules\MembershipOptionsModule;
+use WicketPortus\Modules\PluginInventoryModule;
+use WicketPortus\Modules\ThemeAcfOptionsModule;
 use WicketPortus\Modules\WicketGfOptionsModule;
 use WicketPortus\Modules\WicketSettingsModule;
 use WicketPortus\Registry\ModuleRegistry;
+use WicketPortus\Support\HyperfieldsOptionTransfer;
+use WicketPortus\Support\WarningPrinter;
 use WicketPortus\Support\WordPressOptionReader;
 
 /**
- * Main plugin class.
- *
- * Bootstraps Portus on the plugins_loaded hook, builds the module registry,
- * and registers the core settings adapters. Additional modules (ACC, theme,
- * plugin inventory) are registered by other team members via the
- * wicket_portus_register_modules action.
+ * Main Portus plugin bootstrap.
  */
 class Plugin
 {
@@ -25,13 +27,14 @@ class Plugin
 
     private ModuleRegistry $registry;
 
+    private TransferOrchestrator $orchestrator;
+
+    private string $data_tools_hook_suffix = '';
+
     private function __construct() {}
 
     /**
-     * Returns the single plugin instance, creating and booting it on first call.
-     *
-     * Uses late static binding (new static()) so subclasses can extend without
-     * overriding this method.
+     * Returns the singleton plugin instance.
      *
      * @return static
      */
@@ -46,22 +49,23 @@ class Plugin
     }
 
     /**
-     * Initialises the module registry, registers core modules, then fires the
-     * extension hook so other plugin files can add their own adapters.
+     * Bootstraps registry + orchestration and wires admin UI hooks.
+     *
+     * @return void
      */
     private function boot(): void
     {
         $this->registry = new ModuleRegistry();
         $this->register_modules();
+        $this->orchestrator = new TransferOrchestrator($this->registry);
 
         if (is_admin()) {
             add_action('admin_menu', [$this, 'register_portus_data_tools_page'], 99);
+            add_action('admin_enqueue_scripts', [$this, 'enqueue_portus_data_tools_assets']);
         }
 
         /*
-         * Fires after core modules are registered.
-         * Other plugins (Marlon's ACC/theme adapters, Esteban's inventory module)
-         * use this hook to register additional modules.
+         * Allows extensions to register additional modules.
          *
          * @param ModuleRegistry $registry
          */
@@ -69,10 +73,10 @@ class Plugin
     }
 
     /**
-     * Registers the Portus export/import page using HyperFields' built-in UI.
+     * Registers the Portus submenu page beneath Wicket's top-level admin item.
      *
-     * Parent menu is the Wicket base plugin top-level slug (`wicket-settings`).
-     * If unavailable, falls back to Settings to keep the page reachable.
+     * Uses HyperFields admin UI renderer in manual mode so Portus can prepend
+     * sensitive-data warnings and keep ownership of operator messaging.
      *
      * @return void
      */
@@ -84,22 +88,65 @@ class Plugin
             return;
         }
 
-        $options = $this->get_data_tools_options();
-
-        ExportImportUI::registerPage(
-            parentSlug: $this->resolve_parent_menu_slug(),
-            pageSlug: 'wicket-portus-data-tools',
-            options: $options,
-            allowedImportOptions: array_keys($options),
-            prefix: '',
-            title: __('Portus Export / Import', 'wicket-portus'),
-            capability: 'manage_options',
-            description: __('Export and import Wicket-managed option groups.', 'wicket-portus')
+        $this->data_tools_hook_suffix = (string) add_submenu_page(
+            $this->resolve_parent_menu_slug(),
+            __('Portus Export / Import', 'wicket-portus'),
+            __('Portus Export / Import', 'wicket-portus'),
+            'manage_options',
+            'wicket-portus-data-tools',
+            [$this, 'render_portus_data_tools_page']
         );
     }
 
     /**
-     * Emits admin warning when HyperFields isn't loadable.
+     * Enqueues HyperFields assets for the Portus data tools page only.
+     *
+     * @param string $hook_suffix
+     * @return void
+     */
+    public function enqueue_portus_data_tools_assets(string $hook_suffix): void
+    {
+        if ($this->data_tools_hook_suffix === '' || $hook_suffix !== $this->data_tools_hook_suffix) {
+            return;
+        }
+
+        if (class_exists(ExportImportUI::class)) {
+            ExportImportUI::enqueuePageAssets();
+        }
+    }
+
+    /**
+     * Renders the Portus export/import admin page.
+     *
+     * @return void
+     */
+    public function render_portus_data_tools_page(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You are not allowed to access this page.', 'wicket-portus'));
+        }
+
+        if (!class_exists(ExportImportUI::class)) {
+            echo WarningPrinter::admin_notice(
+                __('HyperFields is not available. Portus export/import UI cannot render.', 'wicket-portus'),
+                'error'
+            );
+
+            return;
+        }
+
+        echo WarningPrinter::sensitive_data_notice();
+        echo ExportImportUI::render(
+            options: $this->get_data_tools_options(),
+            allowedImportOptions: array_keys($this->get_data_tools_options()),
+            prefix: '',
+            title: __('Portus Export / Import', 'wicket-portus'),
+            description: __('Export and import Wicket-managed option groups. Review diffs before confirming import.', 'wicket-portus')
+        );
+    }
+
+    /**
+     * Emits admin warning when HyperFields is unavailable.
      *
      * @return void
      */
@@ -109,34 +156,10 @@ class Plugin
             return;
         }
 
-        echo '<div class="notice notice-error"><p>';
-        echo esc_html__('Wicket Portus requires HyperFields to load the export/import admin page.', 'wicket-portus');
-        echo '</p></div>';
-    }
-
-    /**
-     * Returns option names exposed in the first-pass Portus data tools UI.
-     *
-     * @return array<string, string>
-     */
-    private function get_data_tools_options(): array
-    {
-        $options = [
-            'wicket_settings' => 'Wicket Base Settings',
-            'wicket_membership_plugin_options' => 'Wicket Memberships Plugin Options',
-            'wicket_gf_slug_mapping' => 'Wicket GF Slug Mapping',
-            'wicket_gf_pagination_sidebar_layout' => 'Wicket GF Pagination Sidebar Layout',
-            'wicket_gf_member_fields' => 'Wicket GF Member Fields',
-        ];
-
-        /**
-         * Allows additional option groups to be added to the Portus data tools UI.
-         *
-         * @param array<string, string> $options
-         */
-        $options = apply_filters('wicket_portus_data_tools_options', $options);
-
-        return is_array($options) ? $options : [];
+        echo WarningPrinter::admin_notice(
+            __('Wicket Portus requires HyperFields to load the export/import admin page.', 'wicket-portus'),
+            'error'
+        );
     }
 
     /**
@@ -160,28 +183,65 @@ class Plugin
     }
 
     /**
-     * Registers the settings adapters owned by Alex:
-     * wicket_settings, memberships, and Wicket GF plugin options.
+     * Aggregates option groups for HyperFields UI from module providers.
+     *
+     * @return array<string, string>
+     */
+    private function get_data_tools_options(): array
+    {
+        $options = [];
+
+        foreach ($this->registry->all() as $module) {
+            if ($module instanceof OptionGroupProviderInterface) {
+                $options = array_merge($options, $module->option_groups());
+            }
+        }
+
+        /**
+         * Allows extensions to add/remove option groups in Portus data tools UI.
+         *
+         * @param array<string, string> $options
+         */
+        $options = apply_filters('wicket_portus_data_tools_options', $options);
+
+        return is_array($options) ? $options : [];
+    }
+
+    /**
+     * Registers core modules for the accelerated lane MVP.
+     *
+     * @return void
      */
     private function register_modules(): void
     {
         $reader = new WordPressOptionReader();
+        $transfer = new HyperfieldsOptionTransfer();
 
-        $this->registry->register(new WicketSettingsModule($reader));
-        $this->registry->register(new MembershipOptionsModule($reader));
-        $this->registry->register(new WicketGfOptionsModule($reader));
+        $this->registry->register(new PluginInventoryModule());
+        $this->registry->register(new WicketSettingsModule($reader, $transfer));
+        $this->registry->register(new MembershipOptionsModule($reader, $transfer));
+        $this->registry->register(new WicketGfOptionsModule($reader, $transfer));
+        $this->registry->register(new AccCarbonFieldsOptionsModule($reader, $transfer));
+        $this->registry->register(new ThemeAcfOptionsModule($reader, $transfer));
     }
 
     /**
      * Returns the module registry.
-     *
-     * Used by Esteban's ManifestBuilder and admin page controller to iterate
-     * all registered modules for export, validate, and import operations.
      *
      * @return ModuleRegistry
      */
     public function registry(): ModuleRegistry
     {
         return $this->registry;
+    }
+
+    /**
+     * Returns the transfer orchestrator.
+     *
+     * @return TransferOrchestrator
+     */
+    public function orchestrator(): TransferOrchestrator
+    {
+        return $this->orchestrator;
     }
 }

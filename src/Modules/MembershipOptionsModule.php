@@ -5,30 +5,25 @@ declare(strict_types=1);
 namespace WicketPortus\Modules;
 
 use WicketPortus\Contracts\ConfigModuleInterface;
+use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\ImportResult;
+use WicketPortus\Support\HyperfieldsOptionTransfer;
 use WicketPortus\Support\WordPressOptionReader;
 
 /**
  * Handles export/import of Wicket Memberships plugin-level settings.
- *
- * Scope: `wicket_membership_plugin_options` only.
- * CPT-backed records (membership configs, tiers) are handled by MembershipConfigPostsModule (stretch).
- * Live membership records created by customer transactions are never in scope.
- *
- * Import replaces the entire option. No merging.
  */
-class MembershipOptionsModule implements ConfigModuleInterface
+class MembershipOptionsModule implements ConfigModuleInterface, OptionGroupProviderInterface
 {
     private const OPTION_KEY = 'wicket_membership_plugin_options';
 
     public function __construct(
-        private readonly WordPressOptionReader $reader
+        private readonly WordPressOptionReader $reader,
+        private readonly HyperfieldsOptionTransfer $transfer
     ) {}
 
     /**
      * @inheritdoc
-     *
-     * @return string
      */
     public function key(): string
     {
@@ -36,13 +31,17 @@ class MembershipOptionsModule implements ConfigModuleInterface
     }
 
     /**
-     * Reads wicket_membership_plugin_options and wraps it under the
-     * 'plugin_options' key so the manifest shape is explicit about what
-     * this module owns vs. the CPT-backed records in MembershipConfigPostsModule.
-     *
-     * {@inheritdoc}
-     *
-     * @return array
+     * @inheritdoc
+     */
+    public function option_groups(): array
+    {
+        return [
+            self::OPTION_KEY => 'Wicket Memberships Plugin Options',
+        ];
+    }
+
+    /**
+     * @inheritdoc
      */
     public function export(): array
     {
@@ -54,12 +53,7 @@ class MembershipOptionsModule implements ConfigModuleInterface
     }
 
     /**
-     * Checks that the payload contains a 'plugin_options' key and that its
-     * value is an array. Both checks are hard errors because a missing or
-     * malformed plugin_options would produce a broken import.
-     *
-     * @param array $payload
-     * @return string[]
+     * @inheritdoc
      */
     public function validate(array $payload): array
     {
@@ -79,25 +73,14 @@ class MembershipOptionsModule implements ConfigModuleInterface
     }
 
     /**
-     * Imports wicket_membership_plugin_options into this environment.
-     *
-     * Validates the payload structure first. Aborts on errors. In dry-run
-     * mode, reports what would be written without touching the database.
-     *
-     * {@inheritdoc}
-     *
-     * @param array $payload
-     * @param array $options
-     * @return ImportResult
+     * @inheritdoc
      */
     public function import(array $payload, array $options = []): ImportResult
     {
-        $dry_run = $options['dry_run'] ?? true;
-
+        $dry_run = (bool) ($options['dry_run'] ?? true);
         $result = $dry_run ? ImportResult::dry_run() : ImportResult::commit();
 
-        $validation_errors = $this->validate($payload);
-        foreach ($validation_errors as $error) {
+        foreach ($this->validate($payload) as $error) {
             $result->add_error($error);
         }
 
@@ -105,20 +88,45 @@ class MembershipOptionsModule implements ConfigModuleInterface
             return $result;
         }
 
-        $plugin_options = $payload['plugin_options'];
+        $option_values = [
+            self::OPTION_KEY => $payload['plugin_options'],
+        ];
 
         if ($dry_run) {
-            $result->add_imported(self::OPTION_KEY);
+            $diff = $this->transfer->diff_option_values(
+                $option_values,
+                [self::OPTION_KEY],
+                '',
+                'replace'
+            );
+
+            if (!($diff['success'] ?? false)) {
+                $result->add_error((string) ($diff['message'] ?? 'memberships: dry-run diff failed.'));
+
+                return $result;
+            }
+
+            $changes = $diff['changes'] ?? [];
+            if (is_array($changes) && array_key_exists(self::OPTION_KEY, $changes)) {
+                $result->add_imported(self::OPTION_KEY);
+            } else {
+                $result->add_skipped(self::OPTION_KEY, 'no changes detected');
+            }
 
             return $result;
         }
 
-        $saved = $this->reader->set(self::OPTION_KEY, $plugin_options);
+        $import = $this->transfer->import_option_values(
+            $option_values,
+            [self::OPTION_KEY],
+            '',
+            'replace'
+        );
 
-        if ($saved) {
+        if ($import['success'] ?? false) {
             $result->add_imported(self::OPTION_KEY);
         } else {
-            $result->add_error('memberships: update_option() returned false — option may be unchanged or the write failed.');
+            $result->add_error((string) ($import['message'] ?? 'memberships: import failed.'));
         }
 
         return $result;

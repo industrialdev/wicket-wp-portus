@@ -50,4 +50,31 @@ class WordPressOptionReader
     {
         return get_option($key, null) !== null;
     }
+
+    /**
+     * Returns option names matching a SQL LIKE pattern.
+     *
+     * Example patterns:
+     * - options_%
+     * - carbon_fields_container_wicket_acc_options%
+     *
+     * @param string $like_pattern
+     * @return string[]
+     */
+    public function find_option_names_by_like(string $like_pattern): array
+    {
+        global $wpdb;
+
+        $sql = $wpdb->prepare(
+            "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s ORDER BY option_name ASC",
+            $like_pattern
+        );
+
+        $rows = $wpdb->get_col($sql);
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        return array_values(array_map('strval', $rows));
+    }
 }
