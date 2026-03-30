@@ -118,6 +118,10 @@ class Plugin
     /**
      * Renders the Portus export/import admin page.
      *
+     * Export is handled here via TransferOrchestrator to produce the full Portus
+     * manifest schema. Import/diff still delegate to ExportImportUI for the
+     * file-upload and diff-preview flow.
+     *
      * @return void
      */
     public function render_portus_data_tools_page(): void
@@ -135,13 +139,57 @@ class Plugin
             return;
         }
 
+        $orchestrator = $this->orchestrator;
+
         echo WarningPrinter::sensitive_data_notice();
         echo ExportImportUI::render(
             options: $this->get_data_tools_options(),
             allowedImportOptions: array_keys($this->get_data_tools_options()),
             prefix: '',
             title: __('Portus Export / Import', 'wicket-portus'),
-            description: __('Export and import Wicket-managed option groups. Review diffs before confirming import.', 'wicket-portus')
+            description: __('Export and import Wicket-managed option groups. Review diffs before confirming import.', 'wicket-portus'),
+            exporter: static function () use ($orchestrator): string {
+                $manifest = $orchestrator->export();
+                $encoded  = wp_json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+                return is_string($encoded) ? $encoded : '';
+            },
+            previewer: static function (array $decoded, string $jsonString) use ($orchestrator): array {
+                // Validate it looks like a Portus manifest.
+                if (!isset($decoded['modules']) || !is_array($decoded['modules'])) {
+                    return ['success' => false, 'message' => __('The uploaded file does not appear to be a valid Portus manifest.', 'wicket-portus')];
+                }
+
+                // current = what the orchestrator would export right now (for diff display).
+                $current  = $orchestrator->export();
+                $incoming = $decoded;
+
+                $transientKey = 'hf_import_preview_' . md5(wp_generate_uuid4());
+                set_transient($transientKey, $jsonString, 5 * MINUTE_IN_SECONDS);
+
+                return [
+                    'success'       => true,
+                    'transient_key' => $transientKey,
+                    'current'       => $current,
+                    'incoming'      => $incoming,
+                ];
+            },
+            importer: static function (string $jsonString) use ($orchestrator): array {
+                $decoded = json_decode($jsonString, true);
+                if (!is_array($decoded) || !isset($decoded['modules'])) {
+                    return ['success' => false, 'message' => __('Import failed: invalid Portus manifest.', 'wicket-portus')];
+                }
+
+                $result = $orchestrator->import($decoded, dry_run: false);
+                $errors = $result['errors'] ?? [];
+
+                return [
+                    'success' => empty($errors),
+                    'message' => empty($errors)
+                        ? __('Portus manifest imported successfully.', 'wicket-portus')
+                        : implode(' ', array_map('strval', $errors)),
+                ];
+            },
         );
     }
 

@@ -24,27 +24,36 @@ class TransferOrchestrator
     /**
      * Exports a manifest from selected modules (or all when empty).
      *
+     * The envelope shape is driven by SchemaConfig in build_manager() and matches
+     * the designed Portus manifest contract:
+     *
+     * {
+     *   "schema_version": 1,
+     *   "type": "wicket_portus_manifest",
+     *   "generated_at": "...",
+     *   "site": { "url": "...", "environment": "..." },
+     *   "modules": { ... },
+     *   "errors": []
+     * }
+     *
      * @param string[] $module_keys
      * @return array<string, mixed>
      */
     public function export(array $module_keys = []): array
     {
-        $keys = $this->resolve_module_keys($module_keys);
+        $keys    = $this->resolve_module_keys($module_keys);
         $manager = $this->build_manager($keys);
-        $bundle = $manager->export($keys);
+        $bundle  = $manager->export($keys);
 
+        // Unwrap the inner ['payload'] wrapper added by build_manager() exporters.
         $modules = [];
         foreach (($bundle['modules'] ?? []) as $module_key => $module_payload) {
             $modules[$module_key] = is_array($module_payload) ? ($module_payload['payload'] ?? []) : [];
         }
 
-        return [
-            'schema_version' => 1,
-            'type' => 'wicket_portus_manifest',
-            'generated_at' => gmdate('c'),
-            'modules' => $modules,
-            'errors' => $bundle['errors'] ?? [],
-        ];
+        // Return the full Manager envelope (which carries site, type, schema_version
+        // from SchemaConfig) with the unwrapped module payloads substituted in.
+        return array_merge($bundle, ['modules' => $modules]);
     }
 
     /**
