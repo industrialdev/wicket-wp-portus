@@ -17,48 +17,52 @@ use WicketPortus\Contracts\ConfigModuleInterface;
  * The import controller calls get() to look up the correct module for each
  * key found in an incoming manifest.
  */
-class ModuleRegistry {
+class ModuleRegistry
+{
+    /** @var ConfigModuleInterface[] Keyed by module key. */
+    private array $modules = [];
 
-	/** @var ConfigModuleInterface[] Keyed by module key. */
-	private array $modules = [];
+    /**
+     * Adds a module to the registry.
+     * If a module with the same key already exists it is replaced.
+     *
+     * @param ConfigModuleInterface $module
+     * @return void
+     */
+    public function register(ConfigModuleInterface $module): void
+    {
+        $this->modules[$module->key()] = $module;
+    }
 
-	/**
-	 * Adds a module to the registry.
-	 * If a module with the same key already exists it is replaced.
-	 *
-	 * @param ConfigModuleInterface $module
-	 * @return void
-	 */
-	public function register( ConfigModuleInterface $module ): void {
-		$this->modules[ $module->key() ] = $module;
-	}
+    /**
+     * Returns all registered modules, keyed by their module key.
+     *
+     * @return ConfigModuleInterface[]
+     */
+    public function all(): array
+    {
+        return $this->modules;
+    }
 
-	/**
-	 * Returns all registered modules, keyed by their module key.
-	 *
-	 * @return ConfigModuleInterface[]
-	 */
-	public function all(): array {
-		return $this->modules;
-	}
+    /**
+     * Returns the module registered under the given key, or null if not found.
+     *
+     * @param string $key
+     * @return ConfigModuleInterface|null
+     */
+    public function get(string $key): ?ConfigModuleInterface
+    {
+        return $this->modules[$key] ?? null;
+    }
 
-	/**
-	 * Returns the module registered under the given key, or null if not found.
-	 *
-	 * @param string $key
-	 * @return ConfigModuleInterface|null
-	 */
-	public function get( string $key ): ?ConfigModuleInterface {
-		return $this->modules[ $key ] ?? null;
-	}
-
-	/**
-	 * Returns true when a module is registered under the given key.
-	 *
-	 * @param string $key
-	 * @return bool
-	 */
-	public function has( string $key ): bool {
-		return isset( $this->modules[ $key ] );
-	}
+    /**
+     * Returns true when a module is registered under the given key.
+     *
+     * @param string $key
+     * @return bool
+     */
+    public function has(string $key): bool
+    {
+        return isset($this->modules[$key]);
+    }
 }
