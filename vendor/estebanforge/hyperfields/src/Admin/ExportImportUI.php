@@ -929,9 +929,6 @@ CSS);
                     container.innerHTML = '';
                     var diffHtml = fmt.format(delta, current);
                     container.innerHTML = diffHtml;
-                    if (typeof fmt.hideUnchanged === 'function') {
-                        fmt.hideUnchanged();
-                    }
                 } catch (e) {
                     container.innerHTML = '<p><?php echo esc_js(__('Could not load or render diff. Please check the browser console for details.', 'hyperfields')); ?></p>';
                     console.error('jsondiffpatch error', e);

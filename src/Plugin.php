@@ -171,13 +171,31 @@ class Plugin
                 return is_string($encoded) ? $encoded : '';
         };
 
+        $manifest_module_keys = static function (array $decoded): array {
+            $modules = $decoded['modules'] ?? null;
+            if (!is_array($modules)) {
+                return [];
+            }
+
+            $keys = array_keys($modules);
+
+            return array_values(array_unique(array_map('strval', $keys)));
+        };
+
+        $normalize_manifest_for_diff = static function (array $manifest): array {
+            // Volatile envelope keys create noise and do not affect import writes.
+            unset($manifest['generated_at'], $manifest['errors'], $manifest['export_mode']);
+
+            return $manifest;
+        };
+
         $previewer = static function (
             array $decoded,
             string $jsonString,
             array $allowedImportOptions = [],
             string $prefix = '',
             array $options = [],
-        ) use ($orchestrator): array {
+        ) use ($orchestrator, $manifest_module_keys, $normalize_manifest_for_diff): array {
             unset($allowedImportOptions, $prefix, $options);
 
                 // Validate it looks like a Portus manifest.
@@ -185,9 +203,20 @@ class Plugin
                     return ['success' => false, 'message' => __('The uploaded file does not appear to be a valid Portus manifest.', 'wicket-portus')];
                 }
 
-                // current = what the orchestrator would export right now (for diff display).
-                $current  = $orchestrator->export();
+                $module_keys = $manifest_module_keys($decoded);
+                if (empty($module_keys)) {
+                    return ['success' => false, 'message' => __('The uploaded manifest does not contain any importable modules.', 'wicket-portus')];
+                }
+
+                $incoming_mode = isset($decoded['export_mode']) ? (string) $decoded['export_mode'] : 'full';
+                $incoming_mode = in_array($incoming_mode, ['template', 'full'], true) ? $incoming_mode : 'full';
+
+                // current = what the orchestrator would export for the same module set (for diff display).
+                $current  = $orchestrator->export($module_keys, $incoming_mode);
                 $incoming = $decoded;
+
+                $current = $normalize_manifest_for_diff($current);
+                $incoming = $normalize_manifest_for_diff($incoming);
 
                 $transientKey = 'hf_import_preview_' . md5(wp_generate_uuid4());
                 set_transient($transientKey, $jsonString, 5 * MINUTE_IN_SECONDS);
@@ -204,7 +233,7 @@ class Plugin
             string $jsonString,
             array $allowedImportOptions = [],
             string $prefix = '',
-        ) use ($orchestrator): array {
+        ) use ($orchestrator, $manifest_module_keys): array {
             unset($allowedImportOptions, $prefix);
 
                 $decoded = json_decode($jsonString, true);
@@ -212,7 +241,12 @@ class Plugin
                     return ['success' => false, 'message' => __('Import failed: invalid Portus manifest.', 'wicket-portus')];
                 }
 
-                $result = $orchestrator->import($decoded, dry_run: false);
+                $module_keys = $manifest_module_keys($decoded);
+                if (empty($module_keys)) {
+                    return ['success' => false, 'message' => __('Import failed: no supported modules found in manifest.', 'wicket-portus')];
+                }
+
+                $result = $orchestrator->import($decoded, dry_run: false, module_keys: $module_keys);
                 $errors = $result['errors'] ?? [];
 
                 return [
