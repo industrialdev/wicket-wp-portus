@@ -89,9 +89,9 @@ class Plugin
         }
 
         $this->data_tools_hook_suffix = (string) add_submenu_page(
-            $this->resolve_parent_menu_slug(),
+            'wicket-settings',
             __('Portus Export / Import', 'wicket-portus'),
-            __('Portus Export / Import', 'wicket-portus'),
+            __('Portus', 'wicket-portus'),
             'manage_options',
             'wicket-portus-data-tools',
             [$this, 'render_portus_data_tools_page']
@@ -160,26 +160,6 @@ class Plugin
             __('Wicket Portus requires HyperFields to load the export/import admin page.', 'wicket-portus'),
             'error'
         );
-    }
-
-    /**
-     * Resolves the admin parent slug for the Portus submenu page.
-     *
-     * @return string
-     */
-    private function resolve_parent_menu_slug(): string
-    {
-        global $menu;
-
-        if (is_array($menu)) {
-            foreach ($menu as $menu_item) {
-                if (isset($menu_item[2]) && $menu_item[2] === 'wicket-settings') {
-                    return 'wicket-settings';
-                }
-            }
-        }
-
-        return 'options-general.php';
     }
 
     /**
