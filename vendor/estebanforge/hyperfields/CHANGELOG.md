@@ -1,14 +1,5 @@
 # Changelog
 
-## [1.1.1] - 2026-03-30
-
-### Added
-- `Transfer\SchemaConfig` value object — lets callers override the export envelope's `type`, `schema_version`, and inject arbitrary top-level keys (e.g. `site`, `environment`) via a typed `extra` array
-- `Transfer\Manager::withSchema(SchemaConfig $config): static` — fluent method to attach a `SchemaConfig` before calling `export()`; returns the same `Manager` instance for chaining
-
-### Changed
-- `Transfer\Manager::export()` now builds the bundle envelope from the attached `SchemaConfig` when one is set; falls back to the original defaults (`type: hyperfields_transfer_bundle`, `schema_version: 1`) when none is provided — fully backwards compatible
-
 ## [1.1.0] - 2026-03-28
 
 ### Added
