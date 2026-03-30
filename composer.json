@@ -1,0 +1,17 @@
+{
+  "name": "wicket/wicket-wp-portus",
+  "description": "Makes Wicket site configuration portable, reviewable, and repeatable.",
+  "type": "wordpress-plugin",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "WicketPortus\\": "src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true
+  }
+}

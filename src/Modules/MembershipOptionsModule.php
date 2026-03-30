@@ -1,0 +1,89 @@
+<?php
+
+declare(strict_types=1);
+
+namespace WicketPortus\Modules;
+
+use WicketPortus\Contracts\ConfigModuleInterface;
+use WicketPortus\Manifest\ImportResult;
+use WicketPortus\Support\WordPressOptionReader;
+
+/**
+ * Handles export/import of Wicket Memberships plugin-level settings.
+ *
+ * Scope: `wicket_membership_plugin_options` only.
+ * CPT-backed records (membership configs, tiers) are handled by MembershipConfigPostsModule (stretch).
+ * Live membership records created by customer transactions are never in scope.
+ *
+ * Import replaces the entire option. No merging.
+ */
+class MembershipOptionsModule implements ConfigModuleInterface {
+
+	private const OPTION_KEY = 'wicket_membership_plugin_options';
+
+	public function __construct(
+		private readonly WordPressOptionReader $reader
+	) {}
+
+	public function key(): string {
+		return 'memberships';
+	}
+
+	public function export(): array {
+		$value = $this->reader->get( self::OPTION_KEY, [] );
+
+		return [
+			'plugin_options' => is_array( $value ) ? $value : [],
+		];
+	}
+
+	/**
+	 * @return string[]
+	 */
+	public function validate( array $payload ): array {
+		$errors = [];
+
+		if ( ! isset( $payload['plugin_options'] ) ) {
+			$errors[] = 'memberships: manifest is missing "plugin_options" key.';
+			return $errors;
+		}
+
+		if ( ! is_array( $payload['plugin_options'] ) ) {
+			$errors[] = 'memberships: "plugin_options" must be an array.';
+		}
+
+		return $errors;
+	}
+
+	public function import( array $payload, array $options = [] ): ImportResult {
+		$dry_run = $options['dry_run'] ?? true;
+
+		$result = $dry_run ? ImportResult::dry_run() : ImportResult::commit();
+
+		$validation_errors = $this->validate( $payload );
+		foreach ( $validation_errors as $error ) {
+			$result->add_error( $error );
+		}
+
+		if ( ! $result->is_successful() ) {
+			return $result;
+		}
+
+		$plugin_options = $payload['plugin_options'];
+
+		if ( $dry_run ) {
+			$result->add_imported( self::OPTION_KEY );
+			return $result;
+		}
+
+		$saved = $this->reader->set( self::OPTION_KEY, $plugin_options );
+
+		if ( $saved ) {
+			$result->add_imported( self::OPTION_KEY );
+		} else {
+			$result->add_error( 'memberships: update_option() returned false — option may be unchanged or the write failed.' );
+		}
+
+		return $result;
+	}
+}
