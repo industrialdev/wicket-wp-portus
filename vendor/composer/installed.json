@@ -2,30 +2,30 @@
     "packages": [
         {
             "name": "estebanforge/hyperfields",
-            "version": "1.1.4",
-            "version_normalized": "1.1.4.0",
+            "version": "1.1.5",
+            "version_normalized": "1.1.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/EstebanForge/HyperFields.git",
-                "reference": "a36b811dbc022c69c4047b0a0cbedc14cfb4f830"
+                "reference": "30f2ce0bd18c66d0692bfcac3f281709d42d49ca"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/EstebanForge/HyperFields/zipball/a36b811dbc022c69c4047b0a0cbedc14cfb4f830",
-                "reference": "a36b811dbc022c69c4047b0a0cbedc14cfb4f830",
+                "url": "https://api.github.com/repos/EstebanForge/HyperFields/zipball/30f2ce0bd18c66d0692bfcac3f281709d42d49ca",
+                "reference": "30f2ce0bd18c66d0692bfcac3f281709d42d49ca",
                 "shasum": ""
             },
             "require": {
                 "php": ">=8.1"
             },
             "require-dev": {
-                "brain/monkey": "^2.6",
-                "friendsofphp/php-cs-fixer": "^3.0",
-                "mockery/mockery": "^1.6",
-                "pestphp/pest": "^4.4",
-                "phpunit/phpunit": "^12.0"
+                "brain/monkey": "^2",
+                "friendsofphp/php-cs-fixer": "^3",
+                "mockery/mockery": "^1",
+                "pestphp/pest": "^4",
+                "phpunit/phpunit": "^12"
             },
-            "time": "2026-03-30T00:37:55+00:00",
+            "time": "2026-03-30T12:38:41+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -51,7 +51,7 @@
             "description": "HyperFields: A powerful custom field system for WordPress, providing metaboxes, options pages, and conditional logic.",
             "support": {
                 "issues": "https://github.com/EstebanForge/HyperFields/issues",
-                "source": "https://github.com/EstebanForge/HyperFields/tree/1.1.4"
+                "source": "https://github.com/EstebanForge/HyperFields/tree/1.1.5"
             },
             "install-path": "../estebanforge/hyperfields"
         }
