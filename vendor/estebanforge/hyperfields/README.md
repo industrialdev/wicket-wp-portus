@@ -10,6 +10,7 @@ It provides:
 - JSON export/import for options
 - JSON export/import for pages/CPT content
 - pluggable transfer-module orchestration
+- customisable export envelope via `Transfer\SchemaConfig`
 
 ## Installation
 
@@ -61,6 +62,25 @@ composer run test:integration
 composer run test:coverage
 composer run test:xdebug
 ```
+
+## Custom export envelope
+
+Use `Transfer\SchemaConfig` with `Transfer\Manager::withSchema()` to control the JSON bundle shape emitted by `export()`:
+
+```php
+use HyperFields\Transfer\Manager;
+use HyperFields\Transfer\SchemaConfig;
+
+$bundle = (new Manager())
+    ->withSchema(new SchemaConfig(
+        type: 'my_plugin_manifest',
+        schema_version: 2,
+        extra: ['site' => ['url' => get_site_url(), 'environment' => 'staging']],
+    ))
+    ->export();
+```
+
+See `docs/transfer-and-content-export-import.md` for the full reference.
 
 ## License
 

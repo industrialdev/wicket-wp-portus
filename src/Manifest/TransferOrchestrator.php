@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WicketPortus\Manifest;
 
 use HyperFields\Transfer\Manager;
+use HyperFields\Transfer\SchemaConfig;
 use WicketPortus\Contracts\ConfigModuleInterface;
 use WicketPortus\Registry\ModuleRegistry;
 
@@ -103,7 +104,16 @@ class TransferOrchestrator
      */
     private function build_manager(array $module_keys): Manager
     {
-        $manager = new Manager();
+        $manager = (new Manager())->withSchema(new SchemaConfig(
+            type: 'wicket_portus_manifest',
+            schema_version: 1,
+            extra: [
+                'site' => [
+                    'url'         => function_exists('get_site_url') ? get_site_url() : '',
+                    'environment' => defined('WP_ENVIRONMENT_TYPE') ? WP_ENVIRONMENT_TYPE : 'production',
+                ],
+            ],
+        ));
 
         foreach ($module_keys as $module_key) {
             $module = $this->registry->get($module_key);

@@ -77,16 +77,16 @@ Priority order:
 
 ### Esteban Tasks
 
-- [ ] Integrate accelerated transfer dependency and pin version.
-- [ ] Build transfer bridge service with `export`, `diff`, and `import` orchestration.
-- [ ] Add wp-admin action shells for export/validate/import.
-- [ ] Wire result envelopes with warnings + per-module status fields.
+- [x] Integrate accelerated transfer dependency and pin version.
+- [x] Build transfer bridge service with `export`, `diff`, and `import` orchestration.
+- [x] Add wp-admin action shells for export/validate/import.
+- [x] Wire result envelopes with warnings + per-module status fields.
 
 ### Alex Tasks
 
-- [ ] Scaffold option adapter layer for must-ship surfaces.
-- [ ] Implement one complete option module end-to-end (`wicket_settings`) as proof.
-- [ ] Add module-level payload validation contract.
+- [x] Scaffold option adapter layer for must-ship surfaces.
+- [x] Implement one complete option module end-to-end (`wicket_settings`) as proof.
+- [x] Add module-level payload validation contract.
 
 ### Marlon Tasks
 
@@ -96,9 +96,9 @@ Priority order:
 
 ### Day 1 Checkpoint (Stop/Go)
 
-- [ ] Dependency integrated and bootstraps in plugin runtime.
-- [ ] One module can export, diff, and import from wp-admin flow.
-- [ ] Manifest contract still owned by Portus (engine-independent shape preserved).
+- [x] Dependency integrated and bootstraps in plugin runtime.
+- [x] One module can export, diff, and import from wp-admin flow.
+- [x] Manifest contract still owned by Portus (engine-independent shape preserved).
 
 If checkpoint fails:
 
@@ -109,25 +109,25 @@ If checkpoint fails:
 
 ### Esteban Tasks
 
-- [ ] Integrate all option modules into unified export/validate/import pipeline.
-- [ ] Implement plugin inventory export with:
-- [ ] plugin slug
-- [ ] version
-- [ ] active/inactive status
-- [ ] destination missing/version warnings
-- [ ] Add operator-visible sensitive-data warnings to export/import views.
+- [x] Integrate all option modules into unified export/validate/import pipeline.
+- [x] Implement plugin inventory export with:
+- [x] plugin slug
+- [x] version
+- [x] active/inactive status
+- [x] destination missing/version warnings
+- [x] Add operator-visible sensitive-data warnings to export/import views.
 - [ ] Add standardized module result codes (`ok`, `warn`, `skip`, `error`).
 
 ### Alex Tasks
 
-- [ ] Complete adapters for:
-- [ ] `wicket_membership_plugin_options`
-- [ ] Wicket GF plugin option set
-- [ ] ACC Carbon Fields options
-- [ ] theme ACF option values
+- [x] Complete adapters for:
+- [x] `wicket_membership_plugin_options`
+- [x] Wicket GF plugin option set
+- [x] ACC Carbon Fields options
+- [x] theme ACF option values
 - [ ] Finalize import-mode policy per module (`merge` default unless proven safe).
-- [ ] Add strict validation + actionable failure messages.
-- [ ] Add regression checks for option round-trip behavior.
+- [x] Add strict validation + actionable failure messages.
+- [x] Add regression checks for option round-trip behavior.
 
 ### Marlon Tasks
 
@@ -140,8 +140,8 @@ If checkpoint fails:
 ### Day 2 Checkpoint (Stop/Go)
 
 - [ ] All must-ship option-backed modules round-trip through export/dry-run/import.
-- [ ] Missing-plugin warnings render correctly.
-- [ ] Sensitive-data warning appears in both export and import flows.
+- [x] Missing-plugin warnings render correctly.
+- [x] Sensitive-data warning appears in both export and import flows.
 
 If checkpoint fails:
 
