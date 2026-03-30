@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WicketPortus;
 
 use HyperFields\Admin\ExportImportUI;
+use HyperFields\Admin\ExportImportPageConfig;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
@@ -147,20 +148,26 @@ class Plugin
             : 'template';
         $export_mode = in_array($export_mode, ['template', 'full'], true) ? $export_mode : 'template';
 
-        echo WarningPrinter::sensitive_data_notice();
-        echo ExportImportUI::render(
-            options: $this->get_data_tools_options(),
-            allowedImportOptions: array_keys($this->get_data_tools_options()),
-            prefix: '',
-            title: __('Portus Export / Import', 'wicket-portus'),
-            description: __('Export and import Wicket-managed option groups. Review diffs before confirming import.', 'wicket-portus'),
-            exporter: static function () use ($orchestrator, $export_mode): string {
+        $options = $this->get_data_tools_options();
+
+        $exporter = static function (array $selectedNames = [], string $prefix = '') use ($orchestrator, $export_mode): string {
+            unset($selectedNames, $prefix);
+
                 $manifest = $orchestrator->export([], $export_mode);
                 $encoded  = wp_json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
                 return is_string($encoded) ? $encoded : '';
-            },
-            previewer: static function (array $decoded, string $jsonString) use ($orchestrator): array {
+        };
+
+        $previewer = static function (
+            array $decoded,
+            string $jsonString,
+            array $allowedImportOptions = [],
+            string $prefix = '',
+            array $options = [],
+        ) use ($orchestrator): array {
+            unset($allowedImportOptions, $prefix, $options);
+
                 // Validate it looks like a Portus manifest.
                 if (!isset($decoded['modules']) || !is_array($decoded['modules'])) {
                     return ['success' => false, 'message' => __('The uploaded file does not appear to be a valid Portus manifest.', 'wicket-portus')];
@@ -179,8 +186,15 @@ class Plugin
                     'current'       => $current,
                     'incoming'      => $incoming,
                 ];
-            },
-            importer: static function (string $jsonString) use ($orchestrator): array {
+        };
+
+        $importer = static function (
+            string $jsonString,
+            array $allowedImportOptions = [],
+            string $prefix = '',
+        ) use ($orchestrator): array {
+            unset($allowedImportOptions, $prefix);
+
                 $decoded = json_decode($jsonString, true);
                 if (!is_array($decoded) || !isset($decoded['modules'])) {
                     return ['success' => false, 'message' => __('Import failed: invalid Portus manifest.', 'wicket-portus')];
@@ -195,9 +209,22 @@ class Plugin
                         ? __('Portus manifest imported successfully.', 'wicket-portus')
                         : implode(' ', array_map('strval', $errors)),
                 ];
-            },
+        };
+
+        $config = new ExportImportPageConfig(
+            options: $options,
+            allowedImportOptions: array_keys($options),
+            prefix: '',
+            title: __('Portus Export / Import', 'wicket-portus'),
+            description: __('Export and import Wicket-managed option groups. Review diffs before confirming import.', 'wicket-portus'),
+            exporter: $exporter,
+            previewer: $previewer,
+            importer: $importer,
             exportFormExtras: $this->build_export_mode_controls(),
         );
+
+        echo WarningPrinter::sensitive_data_notice();
+        echo ExportImportUI::renderConfigured($config);
     }
 
     /**
