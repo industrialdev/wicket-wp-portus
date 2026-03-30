@@ -7,6 +7,7 @@ namespace WicketPortus\Manifest;
 use HyperFields\Transfer\Manager;
 use HyperFields\Transfer\SchemaConfig;
 use WicketPortus\Contracts\ConfigModuleInterface;
+use WicketPortus\Contracts\SanitizableModuleInterface;
 use WicketPortus\Registry\ModuleRegistry;
 
 /**
@@ -37,9 +38,10 @@ class TransferOrchestrator
      * }
      *
      * @param string[] $module_keys
+     * @param string $mode 'full' (default) or 'template'
      * @return array<string, mixed>
      */
-    public function export(array $module_keys = []): array
+    public function export(array $module_keys = [], string $mode = 'full'): array
     {
         $keys    = $this->resolve_module_keys($module_keys);
         $manager = $this->build_manager($keys);
@@ -48,8 +50,21 @@ class TransferOrchestrator
         // Unwrap the inner ['payload'] wrapper added by build_manager() exporters.
         $modules = [];
         foreach (($bundle['modules'] ?? []) as $module_key => $module_payload) {
-            $modules[$module_key] = is_array($module_payload) ? ($module_payload['payload'] ?? []) : [];
+            $payload = is_array($module_payload) ? ($module_payload['payload'] ?? []) : [];
+
+            // Template mode: sanitize modules that implement SanitizableModuleInterface.
+            if ($mode === 'template') {
+                $module = $this->registry->get($module_key);
+                if ($module instanceof SanitizableModuleInterface) {
+                    $payload = $module->sanitize($payload);
+                }
+            }
+
+            $modules[$module_key] = $payload;
         }
+
+        // Add export_mode to the envelope.
+        $bundle['export_mode'] = $mode;
 
         // Return the full Manager envelope (which carries site, type, schema_version
         // from SchemaConfig) with the unwrapped module payloads substituted in.

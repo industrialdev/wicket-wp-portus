@@ -141,6 +141,12 @@ class Plugin
 
         $orchestrator = $this->orchestrator;
 
+        // Read export mode from POST (template = default safer option).
+        $export_mode = isset($_POST['portus_export_mode'])
+            ? sanitize_text_field(wp_unslash($_POST['portus_export_mode']))
+            : 'template';
+        $export_mode = in_array($export_mode, ['template', 'full'], true) ? $export_mode : 'template';
+
         echo WarningPrinter::sensitive_data_notice();
         echo ExportImportUI::render(
             options: $this->get_data_tools_options(),
@@ -148,8 +154,8 @@ class Plugin
             prefix: '',
             title: __('Portus Export / Import', 'wicket-portus'),
             description: __('Export and import Wicket-managed option groups. Review diffs before confirming import.', 'wicket-portus'),
-            exporter: static function () use ($orchestrator): string {
-                $manifest = $orchestrator->export();
+            exporter: static function () use ($orchestrator, $export_mode): string {
+                $manifest = $orchestrator->export([], $export_mode);
                 $encoded  = wp_json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
                 return is_string($encoded) ? $encoded : '';
@@ -190,6 +196,7 @@ class Plugin
                         : implode(' ', array_map('strval', $errors)),
                 ];
             },
+            exportFormExtras: $this->build_export_mode_controls(),
         );
     }
 
@@ -251,6 +258,121 @@ class Plugin
         $this->registry->register(new WicketGfOptionsModule($reader, $transfer));
         $this->registry->register(new AccCarbonFieldsOptionsModule($reader, $transfer));
         $this->registry->register(new ThemeAcfOptionsModule($reader, $transfer));
+    }
+
+    /**
+     * Builds the export mode radio controls HTML.
+     *
+     * Template is the safer default (credentials stripped). Full export requires
+     * an explicit confirmation gate via a checkbox that must be manually checked.
+     *
+     * @return string HTML
+     */
+    private function build_export_mode_controls(): string
+    {
+        $current_mode = isset($_POST['portus_export_mode'])
+            ? sanitize_text_field(wp_unslash($_POST['portus_export_mode']))
+            : 'template';
+
+        ob_start();
+        ?>
+        <div class="hyperpress-field-wrapper" style="margin-top: 20px; padding: 12px; border: 1px solid #c3c4c7; border-radius: 4px; background: #fff;">
+            <h3 style="margin-top: 0;"><?php esc_html_e('Export Mode', 'wicket-portus'); ?></h3>
+            <p class="description">
+                <?php esc_html_e('Choose how sensitive data should be handled in this export.', 'wicket-portus'); ?>
+            </p>
+
+            <fieldset>
+                <legend class="screen-reader-text"><?php esc_html_e('Export mode selection', 'wicket-portus'); ?></legend>
+
+                <label style="display: block; margin-bottom: 10px;">
+                    <input type="radio" name="portus_export_mode" value="template"
+                        <?php checked($current_mode, 'template'); ?>
+                        <?php checked($current_mode, ''); // Default to template if not set ?>>
+                    <strong><?php esc_html_e('Template (Safe for New Clients)', 'wicket-portus'); ?></strong>
+                    <br>
+                    <span class="description">
+                        <?php esc_html_e('Credentials, API keys, and environment-specific URLs are removed. Use this for onboarding new organisations or cloning configuration.', 'wicket-portus'); ?>
+                    </span>
+                </label>
+
+                <label style="display: block; margin-bottom: 10px;">
+                    <input type="radio" name="portus_export_mode" value="full"
+                        <?php checked($current_mode, 'full'); ?>
+                        data-portus-full-export-toggle>
+                    <strong style="color: #d63638;"><?php esc_html_e('Full Export (Includes Credentials)', 'wicket-portus'); ?></strong>
+                    <br>
+                    <span class="description">
+                        <?php esc_html_e('All data including credentials and API keys. Use this for same-client environment sync only.', 'wicket-portus'); ?>
+                    </span>
+                </label>
+
+                <div id="portus-full-export-gate" class="portus-full-export-confirmation" style="margin-top: 15px; padding: 12px; border-left: 4px solid #d63638; background: #fff5f5; display: <?php echo $current_mode === 'full' ? 'block' : 'none'; ?>;">
+                    <p style="margin: 0 0 8px 0; color: #d63638;">
+                        <strong><?php esc_html_e('⚠️ Warning: This export contains sensitive data.', 'wicket-portus'); ?></strong>
+                    </p>
+                    <p style="margin: 0 0 12px 0;" class="description">
+                        <?php esc_html_e('API keys, authentication tokens, and environment URLs will be included. Do not share this file outside your organisation or via insecure channels.', 'wicket-portus'); ?>
+                    </p>
+                    <label style="display: block; margin-top: 8px;">
+                        <input type="checkbox" name="portus_full_export_confirm" value="1">
+                        <span style="font-weight: 600;">
+                            <?php esc_html_e('I understand this file contains sensitive credentials and I will handle it securely.', 'wicket-portus'); ?>
+                        </span>
+                    </label>
+                </div>
+            </fieldset>
+        </div>
+
+        <script>
+        (function () {
+            var fullRadio = document.querySelector('input[data-portus-full-export-toggle]');
+            var gate = document.getElementById('portus-full-export-gate');
+            var confirmation = gate ? gate.querySelector('.portus-full-export-confirmation') : null;
+            var confirmCheckbox = confirmation ? confirmation.querySelector('input[type="checkbox"]') : null;
+            var exportForm = gate ? gate.closest('form') : null;
+            var exportButton = exportForm ? exportForm.querySelector('button[name="hf_export_submit"]') : null;
+
+            if (!fullRadio || !gate || !confirmation || !confirmCheckbox || !exportForm || !exportButton) {
+                return;
+            }
+
+            // Toggle confirmation visibility when Full is selected.
+            fullRadio.addEventListener('change', function () {
+                if (this.checked) {
+                    gate.style.display = 'block';
+                    confirmation.style.display = 'block';
+                    confirmCheckbox.checked = false;
+                    if (exportButton) {
+                        exportButton.disabled = true;
+                        exportButton.classList.add('disabled');
+                    }
+                }
+            });
+
+            // Re-enable export button only when checkbox is checked.
+            if (confirmCheckbox) {
+                confirmCheckbox.addEventListener('change', function () {
+                    if (exportButton) {
+                        exportButton.disabled = !this.checked;
+                        exportButton.classList.toggle('disabled', !this.checked);
+                    }
+                });
+            }
+
+            // Initial state: if full is pre-selected (e.g. form submission error), show confirmation.
+            if (fullRadio.checked) {
+                gate.style.display = 'block';
+                confirmation.style.display = 'block';
+                if (exportButton && !confirmCheckbox.checked) {
+                    exportButton.disabled = true;
+                    exportButton.classList.add('disabled');
+                }
+            }
+        })();
+        </script>
+        <?php
+        return (string) ob_get_clean();
     }
 
     /**

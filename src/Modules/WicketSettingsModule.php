@@ -6,7 +6,9 @@ namespace WicketPortus\Modules;
 
 use WicketPortus\Contracts\ConfigModuleInterface;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
+use WicketPortus\Contracts\SanitizableModuleInterface;
 use WicketPortus\Manifest\ImportResult;
+use WicketPortus\Registry\SensitiveFieldsRegistry;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
 use WicketPortus\Support\WordPressOptionReader;
 
@@ -16,7 +18,7 @@ use WicketPortus\Support\WordPressOptionReader;
  * Uses HyperFields transfer primitives for diff/import so unchanged values are
  * handled correctly (no false hard-fail on update_option(false)).
  */
-class WicketSettingsModule implements ConfigModuleInterface, OptionGroupProviderInterface
+class WicketSettingsModule implements ConfigModuleInterface, OptionGroupProviderInterface, SanitizableModuleInterface
 {
     private const OPTION_KEY = 'wicket_settings';
 
@@ -152,5 +154,20 @@ class WicketSettingsModule implements ConfigModuleInterface, OptionGroupProvider
         }
 
         return $result;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function sanitize(array $payload): array
+    {
+        $sanitized = $payload;
+        $sensitiveKeys = SensitiveFieldsRegistry::for_module($this->key());
+
+        foreach ($sensitiveKeys as $key) {
+            unset($sanitized[$key]);
+        }
+
+        return $sanitized;
     }
 }
