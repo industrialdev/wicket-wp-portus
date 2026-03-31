@@ -634,7 +634,7 @@ CSS);
 
             <p style="margin-top:12px;">
                 <a href="data:application/json;charset=utf-8,<?php echo rawurlencode($exportJson); ?>"
-                   download="hyperfields-export-<?php echo esc_attr(gmdate('Y-m-d')); ?>.json"
+                   download="<?php echo esc_attr(apply_filters('hyperfields/export/filename_prefix', 'hyperfields-export')); ?>-<?php echo esc_attr(gmdate('Y-m-d')); ?>.json"
                    class="button button-primary">
                     <?php esc_html_e('Download JSON', 'hyperfields'); ?>
                 </a>

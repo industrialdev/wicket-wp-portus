@@ -28,6 +28,9 @@ add_action(
     99
 );
 
+add_filter('hyperfields/export/filename_prefix', fn(): string => 'wicket-portus-export');
+
+
 final class Wicket_Portus_Bootstrap
 {
     /**

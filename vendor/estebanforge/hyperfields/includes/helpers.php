@@ -102,7 +102,7 @@ if (!function_exists('hf_resolve_field_context')) {
         $context = [
             'type' => 'option',
             'object_id' => 0,
-            'option_group' => $args['option_group'] ?? apply_filters('hyperfields/helpers/default_option_group', 'hyperfields_options'),
+            'option_group' => $args['option_group'] ?? apply_filters('hyperfields/default_option_group', 'hyperfields_options'),
         ];
 
         if (is_array($source)) {
@@ -201,7 +201,7 @@ if (!function_exists('hf_maybe_sanitize_field_value')) {
         }
 
         // Allow external sanitization via filter when no type is provided
-        return apply_filters('hyperfields/helpers/update_field_sanitize', $value, $name, $args);
+        return apply_filters('hyperfields/update_field_sanitize', $value, $name, $args);
     }
 }
 
