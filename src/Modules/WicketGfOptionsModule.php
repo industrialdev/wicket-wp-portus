@@ -79,15 +79,13 @@ class WicketGfOptionsModule implements ConfigModuleInterface, OptionGroupProvide
      */
     public function validate(array $payload): array
     {
-        $messages = [];
-
-        foreach (array_merge(self::PLAIN_KEYS, self::JSON_ENCODED_KEYS) as $key) {
-            if (!array_key_exists($key, $payload)) {
-                $messages[] = sprintf('gravity_forms_wicket_plugin: key "%s" is absent from manifest.', $key);
-            }
+        // Absent keys are not a structural error — the import loop skips them
+        // gracefully. Only flag a hard error if the payload is not an array at all.
+        if (!is_array($payload)) {
+            return ['gravity_forms_wicket_plugin: payload must be an array.'];
         }
 
-        return $messages;
+        return [];
     }
 
     /**
@@ -98,8 +96,12 @@ class WicketGfOptionsModule implements ConfigModuleInterface, OptionGroupProvide
         $dry_run = (bool) ($options['dry_run'] ?? true);
         $result = $dry_run ? ImportResult::dry_run() : ImportResult::commit();
 
-        foreach ($this->validate($payload) as $message) {
-            $result->add_warning($message);
+        foreach ($this->validate($payload) as $error) {
+            $result->add_error($error);
+        }
+
+        if (!$result->is_successful()) {
+            return $result;
         }
 
         $option_values = [];

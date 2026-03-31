@@ -91,9 +91,14 @@ class PostTypeExportModule implements ConfigModuleInterface
      */
     public function import(array $payload, array $options = []): ImportResult
     {
-        unset($options);
+        $dry_run = (bool) ($options['dry_run'] ?? true);
+        $result = $dry_run ? ImportResult::dry_run() : ImportResult::commit();
 
-        $result = ImportResult::dry_run();
+        $result->add_warning(sprintf(
+            '%s: this module is export-only. No data will be written regardless of import mode.',
+            $this->module_key
+        ));
+
         foreach ($this->validate($payload) as $error) {
             $result->add_error($error);
         }
@@ -105,13 +110,8 @@ class PostTypeExportModule implements ConfigModuleInterface
         foreach (($payload['posts'] ?? []) as $post_row) {
             $slug = is_array($post_row) ? (string) ($post_row['post_name'] ?? '') : '';
             $key = $slug !== '' ? $slug : 'unknown';
-            $result->add_skipped($key, 'post-type import writes are deferred in MVP');
+            $result->add_skipped($key, 'export-only module');
         }
-
-        $result->add_warning(sprintf(
-            '%s: import writes are deferred; this module is currently export-only.',
-            $this->module_key
-        ));
 
         return $result;
     }

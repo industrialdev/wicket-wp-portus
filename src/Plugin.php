@@ -280,7 +280,10 @@ class Plugin
             exportFormExtras: $this->build_export_mode_controls(),
         );
 
-        echo WarningPrinter::sensitive_data_notice();
+        if (in_array($export_mode, ['full', 'developer'], true)) {
+            echo WarningPrinter::sensitive_data_notice();
+        }
+
         echo ExportImportUI::renderConfigured($config);
     }
 
