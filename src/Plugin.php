@@ -154,6 +154,27 @@ class Plugin
             : 'template';
         $export_mode = in_array($export_mode, ['template', 'full', 'developer'], true) ? $export_mode : 'template';
 
+        // Server-side enforcement: sensitive modes require their confirmation
+        // checkboxes to be explicitly ticked. Without confirmation, fall back
+        // to template so the UI gate cannot be bypassed via direct POST.
+        if (in_array($export_mode, ['full', 'developer'], true)) {
+            $full_confirmed = isset($_POST['hf_full_export_confirm'])
+                && sanitize_text_field(wp_unslash($_POST['hf_full_export_confirm'])) === '1';
+
+            if (!$full_confirmed) {
+                $export_mode = 'template';
+            }
+        }
+
+        if ($export_mode === 'developer') {
+            $dev_confirmed = isset($_POST['hf_developer_export_confirm'])
+                && sanitize_text_field(wp_unslash($_POST['hf_developer_export_confirm'])) === '1';
+
+            if (!$dev_confirmed) {
+                $export_mode = 'template';
+            }
+        }
+
         $options = $this->get_data_tools_options();
         $option_groups = $this->get_data_tools_option_groups();
         $selection_module_map = $this->get_export_selection_module_map();
