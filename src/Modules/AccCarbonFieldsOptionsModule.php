@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace WicketPortus\Modules;
 
 use WicketPortus\Contracts\ConfigModuleInterface;
-use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\ImportResult;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
 use WicketPortus\Support\WordPressOptionReader;
 
 /**
  * Export/import adapter for Account Centre Carbon Fields theme options.
+ *
+ * Does NOT implement OptionGroupProviderInterface — this module presents as a
+ * single "Wicket Account Centre" row in the export UI.
  */
-class AccCarbonFieldsOptionsModule implements ConfigModuleInterface, OptionGroupProviderInterface
+class AccCarbonFieldsOptionsModule implements ConfigModuleInterface
 {
     /**
      * LIKE patterns used to discover ACC Carbon Fields option rows.
@@ -43,19 +45,6 @@ class AccCarbonFieldsOptionsModule implements ConfigModuleInterface, OptionGroup
     public function key(): string
     {
         return 'account_centre';
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function option_groups(): array
-    {
-        $groups = [];
-        foreach ($this->discover_option_names() as $option_name) {
-            $groups[$option_name] = sprintf('ACC Carbon Fields: %s', $option_name);
-        }
-
-        return $groups;
     }
 
     /**

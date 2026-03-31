@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace WicketPortus\Modules;
 
 use WicketPortus\Contracts\ConfigModuleInterface;
-use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Contracts\SanitizableModuleInterface;
 use WicketPortus\Manifest\ImportResult;
 use WicketPortus\Registry\SensitiveFieldsRegistry;
@@ -17,8 +16,11 @@ use WicketPortus\Support\WordPressOptionReader;
  *
  * Uses HyperFields transfer primitives for diff/import so unchanged values are
  * handled correctly (no false hard-fail on update_option(false)).
+ *
+ * Does NOT implement OptionGroupProviderInterface — presents as a single
+ * "Wicket Base Settings" row in the export UI.
  */
-class WicketSettingsModule implements ConfigModuleInterface, OptionGroupProviderInterface, SanitizableModuleInterface
+class WicketSettingsModule implements ConfigModuleInterface, SanitizableModuleInterface
 {
     private const OPTION_KEY = 'wicket_settings';
 
@@ -33,16 +35,6 @@ class WicketSettingsModule implements ConfigModuleInterface, OptionGroupProvider
     public function key(): string
     {
         return 'wicket_settings';
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function option_groups(): array
-    {
-        return [
-            self::OPTION_KEY => 'Wicket Base Settings',
-        ];
     }
 
     /**

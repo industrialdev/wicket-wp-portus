@@ -36,13 +36,41 @@ class PluginInventoryModule implements ConfigModuleInterface
         $active_plugins = get_option('active_plugins', []);
         $active_plugins = is_array($active_plugins) ? $active_plugins : [];
 
+        // Wicket plugin base paths for type detection
+        $wicket_bases = [
+            'wicket-wp-base-plugin/wicket.php',
+            'wicket-wp-memberships/wicket.php',
+            'wicket-wp-account-centre/wicket.php',
+            'wicket-wp-financial-fields/wicket.php',
+            'wicket-wp-guest-checkout/wicket.php',
+            'wicket-wp-gravity-forms/wicket.php',
+            'wicket-wp-portus/wicket.php',
+        ];
+
         $inventory = [];
         foreach ($plugins as $plugin_file => $plugin_data) {
+            // Determine if this is a Wicket plugin
+            $plugin_base = strtok($plugin_file, '/');
+            $is_wicket = in_array($plugin_file, $wicket_bases, true) || str_starts_with($plugin_base, 'wicket-wp-');
+
+            // Get dependencies from plugin headers
+            $dependencies = [];
+            if (!empty($plugin_data['RequiresPlugins'])) {
+                $requires_plugins = $plugin_data['RequiresPlugins'];
+                if (is_array($requires_plugins)) {
+                    $dependencies = $requires_plugins;
+                } elseif (is_string($requires_plugins)) {
+                    $dependencies = array_filter(array_map('trim', explode(',', $requires_plugins)));
+                }
+            }
+
             $inventory[] = [
                 'plugin' => (string) $plugin_file,
                 'name' => (string) ($plugin_data['Name'] ?? $plugin_file),
                 'version' => (string) ($plugin_data['Version'] ?? ''),
                 'active' => in_array($plugin_file, $active_plugins, true),
+                'type' => $is_wicket ? 'wicket' : 'third-party',
+                'dependencies' => $dependencies,
             ];
         }
 
@@ -94,6 +122,7 @@ class PluginInventoryModule implements ConfigModuleInterface
 
             $plugin_file = (string) ($plugin_row['plugin'] ?? '');
             $expected_version = (string) ($plugin_row['version'] ?? '');
+            $dependencies = (array) ($plugin_row['dependencies'] ?? []);
 
             if ($plugin_file === '') {
                 continue;
@@ -103,6 +132,20 @@ class PluginInventoryModule implements ConfigModuleInterface
                 $result->add_warning(sprintf('site_inventory: plugin "%s" is missing on destination.', $plugin_file));
                 $result->add_skipped($plugin_file, 'missing plugin');
                 continue;
+            }
+
+            // Check dependencies
+            foreach ($dependencies as $dep_plugin) {
+                $dep_plugin = (string) $dep_plugin;
+                if (!array_key_exists($dep_plugin, $installed)) {
+                    $result->add_warning(
+                        sprintf(
+                            'site_inventory: plugin "%s" requires dependency "%s" which is missing on destination.',
+                            $plugin_file,
+                            $dep_plugin
+                        )
+                    );
+                }
             }
 
             $installed_version = (string) ($installed[$plugin_file]['Version'] ?? '');

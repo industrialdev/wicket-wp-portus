@@ -23,6 +23,11 @@ class ModuleRegistry
     private array $modules = [];
 
     /**
+     * @var string[] Keys of disabled modules.
+     */
+    private array $disabled = [];
+
+    /**
      * Adds a module to the registry.
      * If a module with the same key already exists it is replaced.
      *
@@ -35,13 +40,38 @@ class ModuleRegistry
     }
 
     /**
+     * Disables a module by key. Disabled modules are excluded from exports.
+     *
+     * @param string $key Module key to disable.
+     * @return void
+     */
+    public function disable(string $key): void
+    {
+        $this->disabled[$key] = $key;
+    }
+
+    /**
      * Returns all registered modules, keyed by their module key.
      *
+     * Excludes disabled modules unless $include_disabled is true.
+     *
+     * @param bool $include_disabled Whether to include disabled modules.
      * @return ConfigModuleInterface[]
      */
-    public function all(): array
+    public function all(bool $include_disabled = false): array
     {
-        return $this->modules;
+        if ($include_disabled) {
+            return $this->modules;
+        }
+
+        $enabled = [];
+        foreach ($this->modules as $key => $module) {
+            if (!isset($this->disabled[$key])) {
+                $enabled[$key] = $module;
+            }
+        }
+
+        return $enabled;
     }
 
     /**
@@ -64,5 +94,26 @@ class ModuleRegistry
     public function has(string $key): bool
     {
         return isset($this->modules[$key]);
+    }
+
+    /**
+     * Returns true when a module is disabled.
+     *
+     * @param string $key
+     * @return bool
+     */
+    public function is_disabled(string $key): bool
+    {
+        return isset($this->disabled[$key]);
+    }
+
+    /**
+     * Returns the list of disabled module keys.
+     *
+     * @return string[]
+     */
+    public function disabled_keys(): array
+    {
+        return array_keys($this->disabled);
     }
 }

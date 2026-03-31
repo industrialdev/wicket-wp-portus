@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace WicketPortus\Modules;
 
 use WicketPortus\Contracts\ConfigModuleInterface;
-use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\ImportResult;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
 use WicketPortus\Support\WordPressOptionReader;
 
 /**
  * Handles export/import of Wicket Gravity Forms plugin-level settings.
+ *
+ * Does NOT implement OptionGroupProviderInterface — this module presents as a
+ * single "Wicket Gravity Forms" row in the export UI, not as individual option rows.
  */
-class WicketGfOptionsModule implements ConfigModuleInterface, OptionGroupProviderInterface
+class WicketGfOptionsModule implements ConfigModuleInterface
 {
     private const PLAIN_KEYS = [
         'wicket_gf_pagination_sidebar_layout',
@@ -35,18 +37,6 @@ class WicketGfOptionsModule implements ConfigModuleInterface, OptionGroupProvide
     public function key(): string
     {
         return 'gravity_forms_wicket_plugin';
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function option_groups(): array
-    {
-        return [
-            'wicket_gf_slug_mapping' => 'Wicket GF Slug Mapping',
-            'wicket_gf_pagination_sidebar_layout' => 'Wicket GF Pagination Sidebar Layout',
-            'wicket_gf_member_fields' => 'Wicket GF Member Fields',
-        ];
     }
 
     /**

@@ -9,12 +9,16 @@ use HyperFields\Admin\ExportImportPageConfig;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
+use WicketPortus\Modules\CuratedPagesExportModule;
 use WicketPortus\Modules\DeveloperWpOptionsSnapshotModule;
-use WicketPortus\Modules\MembershipOptionsModule;
+use WicketPortus\Modules\FinancialFieldsModule;
+use WicketPortus\Modules\MyAccountPagesExportModule;
 use WicketPortus\Modules\PostTypeExportModule;
 use WicketPortus\Modules\PluginInventoryModule;
 use WicketPortus\Modules\WicketGfOptionsModule;
+use WicketPortus\Modules\WicketMembershipsModule;
 use WicketPortus\Modules\WicketSettingsModule;
+use WicketPortus\Modules\WooCommerceEmailModule;
 use WicketPortus\Registry\ModuleRegistry;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
 use WicketPortus\Support\WarningPrinter;
@@ -64,6 +68,7 @@ class Plugin
     {
         $this->registry = new ModuleRegistry();
         $this->register_modules();
+        $this->apply_disabled_modules();
         $this->orchestrator = new TransferOrchestrator($this->registry);
 
         if (is_admin()) {
@@ -77,6 +82,34 @@ class Plugin
          * @param ModuleRegistry $registry
          */
         do_action('wicket_portus_register_modules', $this->registry);
+    }
+
+    /**
+     * Applies disabled modules from filter.
+     *
+     * @return void
+     */
+    private function apply_disabled_modules(): void
+    {
+        /**
+         * Filter to disable specific Portus modules.
+         *
+         * Return an array of module keys to disable.
+         *
+         * @param string[] $disabled Module keys to disable.
+         */
+        $disabled = apply_filters('wicket_portus_disabled_modules', [
+            'content_pages',
+            'content_my_account',
+        ]);
+
+        if (!is_array($disabled)) {
+            return;
+        }
+
+        foreach ($disabled as $key) {
+            $this->registry->disable((string) $key);
+        }
     }
 
     /**
@@ -339,6 +372,10 @@ class Plugin
                 continue;
             }
 
+            if ($this->registry->is_disabled($module->key())) {
+                continue;
+            }
+
             if ($module instanceof OptionGroupProviderInterface) {
                 $options = array_merge($options, $module->option_groups());
                 continue;
@@ -369,6 +406,10 @@ class Plugin
 
         foreach ($this->registry->all() as $module) {
             if ($this->is_developer_only_module($module->key())) {
+                continue;
+            }
+
+            if ($this->registry->is_disabled($module->key())) {
                 continue;
             }
 
@@ -404,13 +445,14 @@ class Plugin
     {
         return match ($module_key) {
             'wicket_settings' => 'Wicket Base Plugin',
-            'memberships' => 'Wicket Memberships Plugin',
-            'gravity_forms_wicket_plugin' => 'Wicket Gravity Forms Plugin',
-            'account_centre' => 'Wicket Account Centre Plugin',
+            'memberships' => 'Wicket Memberships',
+            'gravity_forms_wicket_plugin' => 'Wicket Gravity Forms',
+            'account_centre' => 'Wicket Account Centre',
+            'financial_fields' => 'Wicket Financial Fields',
             'site_inventory' => 'Plugin Inventory',
-            'content_pages' => 'Content: Pages',
-            'content_my_account' => 'Content: My Account',
-            'content_wicket_mship_config' => 'Content: Membership Config',
+            'curated_pages' => 'Content: Curated Pages',
+            'my_account_pages' => 'Content: My Account Pages',
+            'woocommerce_emails' => 'WooCommerce Emails',
             'developer_wp_options_snapshot' => 'Developer: Full wp_options Snapshot',
             default => ucwords(str_replace('_', ' ', $module_key)),
         };
@@ -429,6 +471,10 @@ class Plugin
             $module_key = $module->key();
 
             if ($this->is_developer_only_module($module_key)) {
+                continue;
+            }
+
+            if ($this->registry->is_disabled($module_key)) {
                 continue;
             }
 
@@ -465,11 +511,16 @@ class Plugin
     private function module_selection_label(string $module_key): string
     {
         return match ($module_key) {
-            'site_inventory' => 'Plugin Inventory (status + version checks)',
-            'content_pages' => 'Pages (post type: page)',
-            'content_my_account' => 'My Account (post type: my-account)',
-            'content_wicket_mship_config' => 'Membership Config (post type: wicket_mship_config)',
-            default => sprintf('%s (module)', $this->module_group_label($module_key)),
+            'wicket_settings' => 'API credentials and environment settings',
+            'site_inventory' => 'Status + version checks',
+            'curated_pages' => 'Curated page list (shop, checkout, etc.)',
+            'my_account_pages' => 'My account page list (dashboard, profile, org, etc.)',
+            'woocommerce_emails' => 'All email settings',
+            'gravity_forms_wicket_plugin' => 'Slug mapping, pagination, member fields',
+            'memberships' => 'Plugin options + config posts',
+            'account_centre' => 'Plugin options',
+            'financial_fields' => 'Revenue deferral and finance mapping',
+            default => '',
         };
     }
 
@@ -508,11 +559,14 @@ class Plugin
         $this->registry->register(new DeveloperWpOptionsSnapshotModule());
         $this->registry->register(new PostTypeExportModule('content_pages', 'page'));
         $this->registry->register(new PostTypeExportModule('content_my_account', 'my-account'));
-        $this->registry->register(new PostTypeExportModule('content_wicket_mship_config', 'wicket_mship_config'));
+        $this->registry->register(new CuratedPagesExportModule('curated_pages'));
+        $this->registry->register(new MyAccountPagesExportModule('my_account_pages'));
         $this->registry->register(new WicketSettingsModule($reader, $transfer));
-        $this->registry->register(new MembershipOptionsModule($reader, $transfer));
+        $this->registry->register(new WicketMembershipsModule($reader, $transfer));
         $this->registry->register(new WicketGfOptionsModule($reader, $transfer));
         $this->registry->register(new AccCarbonFieldsOptionsModule($reader, $transfer));
+        $this->registry->register(new FinancialFieldsModule($reader, $transfer));
+        $this->registry->register(new WooCommerceEmailModule($reader, $transfer));
     }
 
     /**
