@@ -81,8 +81,6 @@ Priority order:
 
 - [x] Lock manifest v1 keys and schema version.
 - [x] Lock module IDs and ownership boundaries.
-- [ ] Lock import matching rule: slug-first, ID reference-only.
-- [ ] Lock de-scope order and checkpoint criteria.
 
 ### Esteban Tasks
 
@@ -125,7 +123,6 @@ If checkpoint fails:
 - [x] active/inactive status
 - [x] destination missing/version warnings
 - [x] Add operator-visible sensitive-data warnings to export/import views.
-- [ ] Add standardized module result codes (`ok`, `warn`, `skip`, `error`).
 
 ### Alex Tasks
 
@@ -134,16 +131,13 @@ If checkpoint fails:
 - [x] Wicket GF plugin option set
 - [x] ACC Carbon Fields options
 - [x] theme ACF option values
-- [ ] Finalize import-mode policy per module (`merge` default unless proven safe).
 - [x] Add strict validation + actionable failure messages.
 - [x] Add regression checks for option round-trip behavior.
 
 ### Marlon Tasks
 
 - [ ] Pair on option-surface edge cases if blockers appear.
-- [ ] Improve dry-run output readability:
-- [ ] per-module changed/unchanged/skipped counts
-- [ ] warning buckets (missing dependency, unsupported surface, mismatched plugin)
+- [ ] Introduce a dry-run run of the importing, before proceeding with the real one, to ensure everything can run correctly.
 - [ ] Implement structural-page export + dry-run path behind feature flag (no import unless stable).
 
 ### Day 2 Checkpoint (Stop/Go)
