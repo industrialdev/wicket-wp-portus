@@ -457,12 +457,21 @@ textarea.hf-json-codeblock:focus {
     cursor: pointer;
 }
 /* Import diff — diff2html overrides */
+#hf-diff-container .d2h-wrapper {
+    overflow: visible !important;
+}
 #hf-diff-container .d2h-file-collapse,
 #hf-diff-container .d2h-moved-tag {
     display: none !important;
 }
 #hf-diff-container .d2h-file-wrapper {
     margin: 0 !important;
+    overflow: visible !important;
+}
+#hf-diff-container .d2h-file-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 body .hyperpress-options-wrap.hf-diff-view {
     max-width: none;
@@ -836,7 +845,7 @@ CSS);
             <p><?php esc_html_e('Review the changes below. Keys highlighted in green will be added or updated; keys in red will be removed.', 'hyperfields'); ?></p>
             <p><em><?php esc_html_e('Current settings are shown on the left; imported values are on the right.', 'hyperfields'); ?></em></p>
 
-            <div id="hf-diff-container" style="overflow:auto;max-height:900px;border:1px solid #1f2937;border-radius:8px;">
+            <div id="hf-diff-container" style="overflow:auto;max-height:70vh;border:1px solid #1f2937;border-radius:8px;position:relative;">
                 <p style="padding:16px;"><?php esc_html_e('Loading diff…', 'hyperfields'); ?></p>
             </div>
 
