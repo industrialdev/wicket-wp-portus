@@ -89,6 +89,13 @@ final class Wicket_Portus_Bootstrap
             require_once $autoload;
         }
 
+        if (class_exists('\HyperFields\LibraryBootstrap')) {
+            \HyperFields\LibraryBootstrap::init([
+                'plugin_file' => WICKET_PORTUS_FILE,
+                'plugin_url'  => WICKET_PORTUS_URL . 'vendor/estebanforge/hyperfields/',
+            ]);
+        }
+
         if (class_exists('\WicketPortus\Plugin')) {
             WicketPortus\Plugin::get_instance();
         }
