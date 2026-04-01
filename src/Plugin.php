@@ -164,18 +164,31 @@ class Plugin
             ExportImportUI::enqueuePageAssets();
         }
 
+        $script_relative_path = 'assets/js/export-sfx.js';
+        $script_absolute_path = plugin_dir_path(WICKET_PORTUS_FILE) . $script_relative_path;
+        $script_version = file_exists($script_absolute_path)
+            ? (string) filemtime($script_absolute_path)
+            : '1.0.0';
+
+        $audio_relative_path = 'assets/audio/portus-exportus.mp3';
+        $audio_absolute_path = plugin_dir_path(WICKET_PORTUS_FILE) . $audio_relative_path;
+        $audio_version = file_exists($audio_absolute_path)
+            ? (string) filemtime($audio_absolute_path)
+            : '1.0.0';
+        $audio_url = add_query_arg('ver', $audio_version, plugins_url($audio_relative_path, WICKET_PORTUS_FILE));
+
         wp_enqueue_script(
             'wicket-portus-export-sfx',
-            plugins_url('assets/js/export-sfx.js', WICKET_PORTUS_FILE),
+            plugins_url($script_relative_path, WICKET_PORTUS_FILE),
             [],
-            '1.0.0',
+            $script_version,
             true
         );
 
         wp_add_inline_script(
             'wicket-portus-export-sfx',
             'window.wicketPortusExportSfx = ' . wp_json_encode([
-                'audioUrl' => plugins_url('assets/audio/portus-exportus.mp3', WICKET_PORTUS_FILE),
+                'audioUrl' => $audio_url,
             ]) . ';',
             'before'
         );
