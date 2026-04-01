@@ -77,6 +77,7 @@ class Plugin
         }
 
         add_action('wicket_portus/import/after', [$this, 'on_import_after'], 10, 2);
+        add_action('admin_init', [$this, 'maybe_apply_deferred_plugin_changes']);
 
         /*
          * Allows extensions to register additional modules.
@@ -325,10 +326,18 @@ class Plugin
                 /**
                  * Fires after a Portus manifest has been imported.
                  *
+                 * Wrapped in try/catch so that exceptions or wp_redirect()+exit()
+                 * calls from post-import hook callbacks can never suppress the
+                 * success message shown to the operator.
+                 *
                  * @param array $import_result Import result {success: bool, message: string}.
                  * @param array $decoded       The full decoded Portus manifest.
                  */
-                do_action('wicket_portus/import/after', $import_result, $decoded);
+                try {
+                    do_action('wicket_portus/import/after', $import_result, $decoded);
+                } catch (\Throwable $e) {
+                    error_log('wicket_portus/import/after hook error: ' . $e->getMessage());
+                }
 
                 return $import_result;
         };
@@ -703,10 +712,15 @@ class Plugin
     }
 
     /**
-     * Activates/deactivates plugins to match the site_inventory in the manifest.
+     * Queues plugin activation/deactivation changes derived from the manifest.
      *
-     * Portus itself is never deactivated by this routine — doing so mid-request
-     * would abort the remainder of the import flow.
+     * Changes are stored in a short-lived transient and applied on the next
+     * admin_init via maybe_apply_deferred_plugin_changes(). Running
+     * activate_plugin()/deactivate_plugins() mid-render is unsafe: plugin
+     * activation hooks may call wp_redirect()+exit(), which would abort the
+     * page before the success notice is rendered.
+     *
+     * Portus itself is never queued for deactivation.
      *
      * @param array $manifest
      * @return void
@@ -735,7 +749,7 @@ class Plugin
                 continue;
             }
 
-            $plugin_file     = (string) ($plugin_row['plugin'] ?? '');
+            $plugin_file      = (string) ($plugin_row['plugin'] ?? '');
             $should_be_active = (bool) ($plugin_row['active'] ?? false);
 
             if ($plugin_file === '' || $plugin_file === $self_basename) {
@@ -751,12 +765,46 @@ class Plugin
             }
         }
 
+        if (empty($to_activate) && empty($to_deactivate)) {
+            return;
+        }
+
+        set_transient('wicket_portus_deferred_plugin_changes', [
+            'activate'   => $to_activate,
+            'deactivate' => $to_deactivate,
+        ], 60);
+    }
+
+    /**
+     * Applies deferred plugin activate/deactivate changes on admin_init.
+     *
+     * Runs on the request AFTER the import, once the success notice has already
+     * been shown to the operator and the page render is fully complete.
+     *
+     * @return void
+     */
+    public function maybe_apply_deferred_plugin_changes(): void
+    {
+        $changes = get_transient('wicket_portus_deferred_plugin_changes');
+        if (!is_array($changes)) {
+            return;
+        }
+
+        delete_transient('wicket_portus_deferred_plugin_changes');
+
+        if (!function_exists('activate_plugin')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        $to_deactivate = is_array($changes['deactivate'] ?? null) ? $changes['deactivate'] : [];
+        $to_activate   = is_array($changes['activate'] ?? null) ? $changes['activate'] : [];
+
         if (!empty($to_deactivate)) {
             deactivate_plugins($to_deactivate);
         }
 
         foreach ($to_activate as $plugin_file) {
-            activate_plugin($plugin_file, '', false, true);
+            activate_plugin((string) $plugin_file, '', false, true);
         }
     }
 
