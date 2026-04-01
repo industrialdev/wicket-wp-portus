@@ -18,13 +18,8 @@
 
   const audio = new Audio(audioUrl);
   audio.preload = "auto";
-  let allowNativeSubmit = false;
 
   form.addEventListener("submit", (event) => {
-    if (allowNativeSubmit) {
-      return;
-    }
-
     const submitEvent = event;
     const submitter = submitEvent.submitter;
     const activeElement = document.activeElement;
@@ -38,18 +33,7 @@
       return;
     }
 
-    event.preventDefault();
+    // Non-blocking cue: never intercept submit flow.
     void audio.play().catch(() => {});
-
-    window.setTimeout(() => {
-      allowNativeSubmit = true;
-      if (typeof form.requestSubmit === "function") {
-        form.requestSubmit(exportButton);
-        return;
-      }
-
-      // Fallback for older browsers: requestSubmit is preferred because it preserves submitter payload.
-      form.submit();
-    }, 120);
   });
 })();
