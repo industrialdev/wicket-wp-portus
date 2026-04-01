@@ -805,7 +805,7 @@ class Plugin
             return;
         }
 
-        if (!current_user_can('activate_plugins')) {
+        if (function_exists('current_user_can') && !current_user_can('activate_plugins')) {
             return;
         }
 
