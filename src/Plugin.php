@@ -163,6 +163,22 @@ class Plugin
         if (class_exists(ExportImportUI::class)) {
             ExportImportUI::enqueuePageAssets();
         }
+
+        wp_enqueue_script(
+            'wicket-portus-export-sfx',
+            plugins_url('assets/js/export-sfx.js', WICKET_PORTUS_FILE),
+            [],
+            '1.0.0',
+            true
+        );
+
+        wp_add_inline_script(
+            'wicket-portus-export-sfx',
+            'window.wicketPortusExportSfx = ' . wp_json_encode([
+                'audioUrl' => plugins_url('assets/audio/portus-exportus.mp3', WICKET_PORTUS_FILE),
+            ]) . ';',
+            'before'
+        );
     }
 
     /**
