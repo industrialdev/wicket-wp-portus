@@ -87,23 +87,28 @@ class Manager
         $modules = [];
         $errors = [];
 
-        foreach ($selected as $key) {
-            $definition = $this->modules[$key] ?? null;
-            if ($definition === null) {
-                $errors[] = "Module '{$key}' is not registered.";
-                continue;
-            }
+        AuditContext::enterManager();
+        try {
+            foreach ($selected as $key) {
+                $definition = $this->modules[$key] ?? null;
+                if ($definition === null) {
+                    $errors[] = "Module '{$key}' is not registered.";
+                    continue;
+                }
 
-            try {
-                $modules[$key] = call_user_func($definition['exporter'], $context);
-            } catch (\Throwable $throwable) {
-                $errors[] = "Module '{$key}' export failed: " . $throwable->getMessage();
+                try {
+                    $modules[$key] = call_user_func($definition['exporter'], $context);
+                } catch (\Throwable $throwable) {
+                    $errors[] = "Module '{$key}' export failed: " . $throwable->getMessage();
+                }
             }
+        } finally {
+            AuditContext::leaveManager();
         }
 
         $schema = $this->schemaConfig ?? new SchemaConfig();
 
-        return array_merge(
+        $result = array_merge(
             $schema->safeExtra(),
             [
                 'schema_version' => $schema->schema_version,
@@ -113,6 +118,17 @@ class Manager
                 'errors'         => $errors,
             ]
         );
+
+        /**
+         * Fires after Transfer Manager export completes.
+         *
+         * @param array $result
+         * @param array $selected
+         * @param array $context
+         */
+        do_action('hyperfields/transfer_manager/export/after', $result, $selected, $context);
+
+        return $result;
     }
 
     /**
@@ -183,30 +199,48 @@ class Manager
         $errors = [];
         $results = [];
         $payloadModules = isset($bundle['modules']) && is_array($bundle['modules']) ? $bundle['modules'] : [];
+        $attemptedModuleKeys = [];
 
-        foreach ($payloadModules as $key => $payload) {
-            $moduleKey = sanitize_key((string) $key);
-            if ($moduleKey === '') {
-                continue;
-            }
+        AuditContext::enterManager();
+        try {
+            foreach ($payloadModules as $key => $payload) {
+                $moduleKey = sanitize_key((string) $key);
+                if ($moduleKey === '') {
+                    continue;
+                }
+                $attemptedModuleKeys[] = $moduleKey;
 
-            if (!isset($this->modules[$moduleKey])) {
-                $errors[] = "Module '{$moduleKey}' payload found but module is not registered.";
-                continue;
-            }
+                if (!isset($this->modules[$moduleKey])) {
+                    $errors[] = "Module '{$moduleKey}' payload found but module is not registered.";
+                    continue;
+                }
 
-            try {
-                $results[$moduleKey] = call_user_func($this->modules[$moduleKey]['importer'], $payload, $context);
-            } catch (\Throwable $throwable) {
-                $errors[] = "Module '{$moduleKey}' import failed: " . $throwable->getMessage();
+                try {
+                    $results[$moduleKey] = call_user_func($this->modules[$moduleKey]['importer'], $payload, $context);
+                } catch (\Throwable $throwable) {
+                    $errors[] = "Module '{$moduleKey}' import failed: " . $throwable->getMessage();
+                }
             }
+        } finally {
+            AuditContext::leaveManager();
         }
 
-        return [
+        $result = [
             'success' => empty($errors),
             'modules' => $results,
             'errors' => $errors,
         ];
+
+        /**
+         * Fires after Transfer Manager import completes.
+         *
+         * @param array $result
+         * @param array $attemptedModuleKeys
+         * @param array $context
+         */
+        do_action('hyperfields/transfer_manager/import/after', $result, $attemptedModuleKeys, $context);
+
+        return $result;
     }
 
     /**
@@ -231,4 +265,3 @@ class Manager
         return array_values(array_unique($keys));
     }
 }
-

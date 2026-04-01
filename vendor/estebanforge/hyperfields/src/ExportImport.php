@@ -85,17 +85,31 @@ class ExportImport
             $data[$optionName] = self::wrapTypedNode($value, $schema);
         }
 
-        $encoded = wp_json_encode(
-            [
-                'version'     => self::SCHEMA_VERSION,
-                'type'        => 'hyperfields_export',
-                'prefix'      => $prefix,
-                'exported_at' => current_time('mysql'),
-                'site_url'    => get_site_url(),
-                'options'     => $data,
-            ],
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
-        );
+        $payload = [
+            'version'     => self::SCHEMA_VERSION,
+            'type'        => 'hyperfields_export',
+            'prefix'      => $prefix,
+            'exported_at' => current_time('mysql'),
+            'site_url'    => get_site_url(),
+            'options'     => $data,
+        ];
+
+        $encoded = wp_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $result = [
+            'success' => is_string($encoded),
+            'message' => is_string($encoded) ? 'Options exported successfully.' : 'Failed to encode export payload.',
+        ];
+
+        /**
+         * Fires after HyperFields has finished exporting options.
+         *
+         * @param array $result     Export result metadata.
+         * @param array $payload    Decoded payload prior to JSON encoding.
+         * @param array $optionNames Original requested option names.
+         * @param string $prefix    Prefix filter applied.
+         * @param array $schemaMap  Per-option schema map used for typed-node envelopes.
+         */
+        do_action('hyperfields/export/after', $result, $payload, $optionNames, $prefix, $schemaMap);
 
         return $encoded !== false ? $encoded : '{}';
     }
@@ -118,17 +132,26 @@ class ExportImport
     public static function importOptions(string $jsonString, array $allowedOptionNames = [], string $prefix = '', array $options = []): array
     {
         if ($jsonString === '') {
-            return ['success' => false, 'message' => 'Empty import data.'];
+            $result = ['success' => false, 'message' => 'Empty import data.'];
+            self::dispatchImportAfter($result, [], $allowedOptionNames, $prefix, $options);
+
+            return $result;
         }
 
         $decoded = json_decode($jsonString, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            return ['success' => false, 'message' => 'Invalid JSON: ' . json_last_error_msg()];
+            $result = ['success' => false, 'message' => 'Invalid JSON: ' . json_last_error_msg()];
+            self::dispatchImportAfter($result, [], $allowedOptionNames, $prefix, $options);
+
+            return $result;
         }
 
         if (!is_array($decoded) || !isset($decoded['options']) || !is_array($decoded['options'])) {
-            return ['success' => false, 'message' => 'Invalid export format. Expected a "options" key with an array value.'];
+            $result = ['success' => false, 'message' => 'Invalid export format. Expected a "options" key with an array value.'];
+            self::dispatchImportAfter($result, is_array($decoded) ? $decoded : [], $allowedOptionNames, $prefix, $options);
+
+            return $result;
         }
 
         $backupKeys    = [];
@@ -200,11 +223,17 @@ class ExportImport
         }
 
         if ($importedCount === 0 && empty($errors)) {
-            return ['success' => false, 'message' => 'No options were imported. The whitelist or prefix filter may have excluded all entries.'];
+            $result = ['success' => false, 'message' => 'No options were imported. The whitelist or prefix filter may have excluded all entries.'];
+            self::dispatchImportAfter($result, $decoded, $allowedOptionNames, $prefix, $options);
+
+            return $result;
         }
 
         if ($importedCount === 0) {
-            return ['success' => false, 'message' => implode(' ', $errors)];
+            $result = ['success' => false, 'message' => implode(' ', $errors)];
+            self::dispatchImportAfter($result, $decoded, $allowedOptionNames, $prefix, $options);
+
+            return $result;
         }
 
         $message = 'Options imported successfully.';
@@ -217,18 +246,37 @@ class ExportImport
             $result['backup_keys'] = $backupKeys;
         }
 
+        self::dispatchImportAfter($result, $decoded, $allowedOptionNames, $prefix, $options);
+
+        return $result;
+    }
+
+    /**
+     * Fires the import completion action for both success and failure outcomes.
+     *
+     * @param array<string, mixed> $result
+     * @param array<string, mixed> $decoded
+     * @param array<int, string> $allowedOptionNames
+     * @param string $prefix
+     * @param array<string, mixed> $options
+     */
+    private static function dispatchImportAfter(
+        array $result,
+        array $decoded,
+        array $allowedOptionNames,
+        string $prefix,
+        array $options
+    ): void {
         /**
          * Fires after HyperFields has finished importing options.
          *
          * @param array  $result             Import result.
          * @param array  $decoded            The full decoded JSON payload.
-         * @param array  $allowedOptionNames  Whitelist of option names allowed.
+         * @param array  $allowedOptionNames Whitelist of option names allowed.
          * @param string $prefix             Prefix filter applied.
          * @param array  $options            Import behavior options.
          */
         do_action('hyperfields/import/after', $result, $decoded, $allowedOptionNames, $prefix, $options);
-
-        return $result;
     }
 
     /**

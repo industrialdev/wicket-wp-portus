@@ -6,6 +6,7 @@ namespace WicketPortus;
 
 use HyperFields\Admin\ExportImportUI;
 use HyperFields\Admin\ExportImportPageConfig;
+use HyperFields\Transfer\AuditLogStorage;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
@@ -30,6 +31,10 @@ use WicketPortus\Support\WordPressOptionReader;
 class Plugin
 {
     private const MODULE_SELECTION_KEY_PREFIX = '__portus_module__';
+    private const LOGS_VIEW_QUERY_ARG = 'portus_view';
+    private const LOGS_VIEW_QUERY_VALUE = 'transfer_logs';
+    private const LOGS_PAGE_QUERY_ARG = 'paged';
+    private const LOGS_PER_PAGE = 25;
     private const DEVELOPER_ONLY_MODULE_KEYS = [
         'developer_wp_options_snapshot',
     ];
@@ -168,6 +173,12 @@ class Plugin
     {
         if (!current_user_can('manage_options')) {
             wp_die(esc_html__('You are not allowed to access this page.', 'wicket-portus'));
+        }
+
+        if ($this->is_logs_view()) {
+            $this->render_transfer_logs_page();
+
+            return;
         }
 
         if (!class_exists(ExportImportUI::class)) {
@@ -339,6 +350,7 @@ class Plugin
         }
 
         echo ExportImportUI::renderConfigured($config);
+        echo $this->render_transfer_logs_link();
     }
 
     /**
@@ -668,6 +680,150 @@ class Plugin
 
         <?php
         return (string) ob_get_clean();
+    }
+
+    private function is_logs_view(): bool
+    {
+        $view = isset($_GET[self::LOGS_VIEW_QUERY_ARG]) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            ? sanitize_text_field(wp_unslash($_GET[self::LOGS_VIEW_QUERY_ARG])) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            : '';
+
+        return $view === self::LOGS_VIEW_QUERY_VALUE;
+    }
+
+    private function render_transfer_logs_link(): string
+    {
+        $url = add_query_arg(
+            [
+                'page' => 'wicket-portus-data-tools',
+                self::LOGS_VIEW_QUERY_ARG => self::LOGS_VIEW_QUERY_VALUE,
+            ],
+            admin_url('admin.php')
+        );
+
+        return '<div class="wrap hyperpress hyperpress-options-wrap"><p style="text-align:right;margin-top:12px;"><a href="' . esc_url($url) . '">' . esc_html__('View transfer logs', 'wicket-portus') . '</a></p></div>';
+    }
+
+    private function render_transfer_logs_page(): void
+    {
+        if (!class_exists(AuditLogStorage::class)) {
+            echo WarningPrinter::admin_notice(
+                __('HyperFields transfer log storage is not available.', 'wicket-portus'),
+                'error'
+            );
+
+            return;
+        }
+
+        AuditLogStorage::maybePruneExpired();
+
+        $page = isset($_GET[self::LOGS_PAGE_QUERY_ARG]) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            ? max(1, (int) $_GET[self::LOGS_PAGE_QUERY_ARG]) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            : 1;
+
+        $logs = AuditLogStorage::fetchPage($page, self::LOGS_PER_PAGE);
+        $backUrl = add_query_arg(
+            [
+                'page' => 'wicket-portus-data-tools',
+            ],
+            admin_url('admin.php')
+        );
+
+        $baseUrl = add_query_arg(
+            [
+                'page' => 'wicket-portus-data-tools',
+                self::LOGS_VIEW_QUERY_ARG => self::LOGS_VIEW_QUERY_VALUE,
+            ],
+            admin_url('admin.php')
+        );
+
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('Portus Transfer Logs', 'wicket-portus'); ?></h1>
+            <p><?php esc_html_e('Audit trail for HyperFields export/import activity. Older rows are pruned lazily based on retention policy.', 'wicket-portus'); ?></p>
+            <p><a href="<?php echo esc_url($backUrl); ?>">&larr; <?php esc_html_e('Back to Export / Import', 'wicket-portus'); ?></a></p>
+
+            <table class="widefat striped">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Date (UTC)', 'wicket-portus'); ?></th>
+                        <th><?php esc_html_e('Operation', 'wicket-portus'); ?></th>
+                        <th><?php esc_html_e('Status', 'wicket-portus'); ?></th>
+                        <th><?php esc_html_e('API', 'wicket-portus'); ?></th>
+                        <th><?php esc_html_e('Source', 'wicket-portus'); ?></th>
+                        <th><?php esc_html_e('Records', 'wicket-portus'); ?></th>
+                        <th><?php esc_html_e('User', 'wicket-portus'); ?></th>
+                        <th><?php esc_html_e('Objects', 'wicket-portus'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($logs['rows'])): ?>
+                    <tr>
+                        <td colspan="8"><?php esc_html_e('No transfer logs found.', 'wicket-portus'); ?></td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($logs['rows'] as $row): ?>
+                        <?php
+                        $userId = isset($row['user_id']) ? (int) $row['user_id'] : 0;
+                        $userLabel = $userId > 0 ? (string) $userId : __('System', 'wicket-portus');
+                        if ($userId > 0) {
+                            $user = get_userdata($userId);
+                            if ($user && isset($user->user_login)) {
+                                $userLabel = $user->user_login . ' (#' . $userId . ')';
+                            }
+                        }
+
+                        $objectsRaw = isset($row['object_keys']) ? (string) $row['object_keys'] : '';
+                        $objects = json_decode($objectsRaw, true);
+                        $objects = is_array($objects) ? array_values(array_map('strval', $objects)) : [];
+                        $objectsPreview = implode(', ', array_slice($objects, 0, 4));
+                        if (count($objects) > 4) {
+                            $objectsPreview .= ', …';
+                        }
+
+                        $rawStatus = sanitize_key((string) ($row['status'] ?? ''));
+                        $statusLabel = $rawStatus === 'success' ? 'success' : 'error';
+                        $errorSummary = (string) ($row['error_summary'] ?? '');
+                        ?>
+                        <tr>
+                            <td><?php echo esc_html((string) ($row['created_at'] ?? '')); ?></td>
+                            <td><?php echo esc_html((string) ($row['operation'] ?? '')); ?></td>
+                            <td title="<?php echo esc_attr($errorSummary); ?>"><?php echo esc_html($statusLabel); ?></td>
+                            <td><?php echo esc_html((string) ($row['api'] ?? '')); ?></td>
+                            <td><?php echo esc_html((string) ($row['source'] ?? '')); ?></td>
+                            <td><?php echo esc_html((string) ($row['records_count'] ?? '0')); ?></td>
+                            <td><?php echo esc_html($userLabel); ?></td>
+                            <td><?php echo esc_html($objectsPreview); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+
+            <?php
+            $pagination = paginate_links(
+                [
+                    'base' => add_query_arg(self::LOGS_PAGE_QUERY_ARG, '%#%', $baseUrl),
+                    'format' => '',
+                    'current' => (int) ($logs['page'] ?? 1),
+                    'total' => (int) ($logs['total_pages'] ?? 1),
+                    'type' => 'array',
+                    'prev_text' => __('« Previous', 'wicket-portus'),
+                    'next_text' => __('Next »', 'wicket-portus'),
+                ]
+            );
+            if (is_array($pagination) && !empty($pagination)):
+                ?>
+                <div class="tablenav" style="margin-top:12px;">
+                    <div class="tablenav-pages">
+                        <?php foreach ($pagination as $pageLink): ?>
+                            <?php echo wp_kses_post($pageLink); ?>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
     }
 
     /**

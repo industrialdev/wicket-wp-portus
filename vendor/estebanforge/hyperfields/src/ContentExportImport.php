@@ -61,19 +61,31 @@ class ContentExportImport
             }
         }
 
-        $encoded = wp_json_encode(
-            [
-                'version' => self::SCHEMA_VERSION,
-                'type' => 'hyperfields_content_export',
-                'scope' => 'posts',
-                'exported_at' => current_time('mysql'),
-                'site_url' => get_site_url(),
-                'content' => [
-                    'posts' => $exported,
-                ],
+        $payload = [
+            'version' => self::SCHEMA_VERSION,
+            'type' => 'hyperfields_content_export',
+            'scope' => 'posts',
+            'exported_at' => current_time('mysql'),
+            'site_url' => get_site_url(),
+            'content' => [
+                'posts' => $exported,
             ],
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
-        );
+        ];
+        $encoded = wp_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $result = [
+            'success' => is_string($encoded),
+            'message' => is_string($encoded) ? 'Content exported successfully.' : 'Failed to encode content export payload.',
+        ];
+
+        /**
+         * Fires after HyperFields has finished content export.
+         *
+         * @param array $result
+         * @param array $payload
+         * @param array $postTypes
+         * @param array $options
+         */
+        do_action('hyperfields/content_export/after', $result, $payload, $postTypes, $options);
 
         return $encoded !== false ? $encoded : '{}';
     }
@@ -139,12 +151,18 @@ class ContentExportImport
     public static function importPosts(string $jsonString, array $options = []): array
     {
         if ($jsonString === '') {
-            return self::result(false, 'Empty import data.');
+            $result = self::result(false, 'Empty import data.');
+            self::dispatchContentImportAfter($result, [], $options);
+
+            return $result;
         }
 
         $decoded = json_decode($jsonString, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            return self::result(false, 'Invalid JSON: ' . json_last_error_msg());
+            $result = self::result(false, 'Invalid JSON: ' . json_last_error_msg());
+            self::dispatchContentImportAfter($result, [], $options);
+
+            return $result;
         }
 
         if (
@@ -154,7 +172,10 @@ class ContentExportImport
             || !isset($decoded['content']['posts'])
             || !is_array($decoded['content']['posts'])
         ) {
-            return self::result(false, 'Invalid export format. Expected "content.posts" as an array.');
+            $result = self::result(false, 'Invalid export format. Expected "content.posts" as an array.');
+            self::dispatchContentImportAfter($result, is_array($decoded) ? $decoded : [], $options);
+
+            return $result;
         }
 
         $settings = self::normalizeSettings($options);
@@ -309,13 +330,17 @@ class ContentExportImport
         $success = empty($errors);
         $message = $success ? 'Content import completed.' : 'Content import completed with errors.';
 
-        return [
+        $result = [
             'success' => $success,
             'message' => $message,
             'stats' => $stats,
             'actions' => $actions,
             'errors' => $errors,
         ];
+
+        self::dispatchContentImportAfter($result, $decoded, $options);
+
+        return $result;
     }
 
     /**
@@ -329,6 +354,23 @@ class ContentExportImport
     {
         $options['dry_run'] = true;
         return self::importPosts($jsonString, $options);
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     * @param array<string, mixed> $decoded
+     * @param array<string, mixed> $options
+     */
+    private static function dispatchContentImportAfter(array $result, array $decoded, array $options): void
+    {
+        /**
+         * Fires after HyperFields has finished content import (including dry runs).
+         *
+         * @param array $result
+         * @param array $decoded
+         * @param array $options
+         */
+        do_action('hyperfields/content_import/after', $result, $decoded, $options);
     }
 
     private static function normalizeExportPost(mixed $post, array $settings): ?array
