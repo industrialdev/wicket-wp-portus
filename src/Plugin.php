@@ -81,6 +81,9 @@ class Plugin
             add_action('admin_enqueue_scripts', [$this, 'enqueue_portus_data_tools_assets']);
         }
 
+        add_action('wicket_portus/import/after', [$this, 'on_import_after'], 10, 2);
+        add_action('admin_init', [$this, 'maybe_apply_deferred_plugin_changes']);
+
         /*
          * Allows extensions to register additional modules.
          *
@@ -324,12 +327,30 @@ class Plugin
                 $result = $orchestrator->import($decoded, dry_run: false, module_keys: $module_keys);
                 $errors = $result['errors'] ?? [];
 
-                return [
+                $import_result = [
                     'success' => empty($errors),
                     'message' => empty($errors)
                         ? __('Portus manifest imported successfully.', 'wicket-portus')
                         : implode(' ', array_map('strval', $errors)),
                 ];
+
+                /**
+                 * Fires after a Portus manifest has been imported.
+                 *
+                 * Wrapped in try/catch so that exceptions or wp_redirect()+exit()
+                 * calls from post-import hook callbacks can never suppress the
+                 * success message shown to the operator.
+                 *
+                 * @param array $import_result Import result {success: bool, message: string}.
+                 * @param array $decoded       The full decoded Portus manifest.
+                 */
+                try {
+                    do_action('wicket_portus/import/after', $import_result, $decoded);
+                } catch (\Throwable $e) {
+                    error_log('wicket_portus/import/after hook error: ' . $e->getMessage());
+                }
+
+                return $import_result;
         };
 
         $config = new ExportImportPageConfig(
@@ -824,6 +845,167 @@ class Plugin
             <?php endif; ?>
         </div>
         <?php
+    }
+
+    /**
+     * Runs post-import side-effects after a successful Portus manifest import.
+     *
+     * Hooked to `wicket_portus/import/after`. Activates/deactivates plugins
+     * according to the manifest's site_inventory module, then flushes all caches.
+     *
+     * @param array $result   Import result {success: bool, message: string}.
+     * @param array $manifest The full decoded Portus manifest.
+     * @return void
+     */
+    public function on_import_after(array $result, array $manifest): void
+    {
+        if (empty($result['success'])) {
+            return;
+        }
+
+        $this->process_plugin_inventory($manifest);
+        $this->flush_all_caches();
+    }
+
+    /**
+     * Queues plugin activation/deactivation changes derived from the manifest.
+     *
+     * Changes are stored in a short-lived transient and applied on the next
+     * admin_init via maybe_apply_deferred_plugin_changes(). Running
+     * activate_plugin()/deactivate_plugins() mid-render is unsafe: plugin
+     * activation hooks may call wp_redirect()+exit(), which would abort the
+     * page before the success notice is rendered.
+     *
+     * Portus itself is never queued for deactivation.
+     *
+     * @param array $manifest
+     * @return void
+     */
+    private function process_plugin_inventory(array $manifest): void
+    {
+        $plugins = $manifest['modules']['site_inventory']['plugins'] ?? null;
+        if (!is_array($plugins) || empty($plugins)) {
+            return;
+        }
+
+        if (!function_exists('activate_plugin')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        $self_basename = defined('WICKET_PORTUS_FILE') ? plugin_basename(WICKET_PORTUS_FILE) : '';
+
+        $active_plugins = get_option('active_plugins', []);
+        $active_plugins = is_array($active_plugins) ? $active_plugins : [];
+
+        $to_activate   = [];
+        $to_deactivate = [];
+
+        foreach ($plugins as $plugin_row) {
+            if (!is_array($plugin_row)) {
+                continue;
+            }
+
+            $plugin_file      = (string) ($plugin_row['plugin'] ?? '');
+            $should_be_active = (bool) ($plugin_row['active'] ?? false);
+
+            if ($plugin_file === '' || $plugin_file === $self_basename) {
+                continue;
+            }
+
+            $is_active = in_array($plugin_file, $active_plugins, true);
+
+            if ($should_be_active && !$is_active) {
+                $to_activate[] = $plugin_file;
+            } elseif (!$should_be_active && $is_active) {
+                $to_deactivate[] = $plugin_file;
+            }
+        }
+
+        if (empty($to_activate) && empty($to_deactivate)) {
+            return;
+        }
+
+        set_transient('wicket_portus_deferred_plugin_changes', [
+            'activate'   => $to_activate,
+            'deactivate' => $to_deactivate,
+        ], 60);
+    }
+
+    /**
+     * Applies deferred plugin activate/deactivate changes on admin_init.
+     *
+     * Runs on the request AFTER the import, once the success notice has already
+     * been shown to the operator and the page render is fully complete.
+     *
+     * @return void
+     */
+    public function maybe_apply_deferred_plugin_changes(): void
+    {
+        $changes = get_transient('wicket_portus_deferred_plugin_changes');
+        if (!is_array($changes)) {
+            return;
+        }
+
+        delete_transient('wicket_portus_deferred_plugin_changes');
+
+        if (!function_exists('activate_plugin')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        $to_deactivate = is_array($changes['deactivate'] ?? null) ? $changes['deactivate'] : [];
+        $to_activate   = is_array($changes['activate'] ?? null) ? $changes['activate'] : [];
+
+        if (!empty($to_deactivate)) {
+            deactivate_plugins($to_deactivate);
+        }
+
+        foreach ($to_activate as $plugin_file) {
+            activate_plugin((string) $plugin_file, '', false, true);
+        }
+    }
+
+    /**
+     * Flushes the WordPress object cache and known page-caching plugins.
+     *
+     * @return void
+     */
+    private function flush_all_caches(): void
+    {
+        // WordPress object cache
+        wp_cache_flush();
+
+        // W3 Total Cache
+        if (function_exists('w3tc_flush_all')) {
+            w3tc_flush_all();
+        }
+
+        // WP Super Cache
+        if (function_exists('wp_cache_clear_cache')) {
+            wp_cache_clear_cache();
+        }
+
+        // LiteSpeed Cache
+        do_action('litespeed_purge_all');
+
+        // WP Rocket
+        if (function_exists('rocket_clean_domain')) {
+            rocket_clean_domain();
+        }
+
+        // WP Fastest Cache
+        if (isset($GLOBALS['wp_fastest_cache']) && method_exists($GLOBALS['wp_fastest_cache'], 'deleteCache')) {
+            $GLOBALS['wp_fastest_cache']->deleteCache(true);
+        }
+
+        // Autoptimize
+        if (class_exists('autoptimizeCache') && method_exists('autoptimizeCache', 'clearall')) {
+            \autoptimizeCache::clearall();
+        }
+
+        // Breeze (Cloudways)
+        if (class_exists('Breeze_Admin') && method_exists('Breeze_Admin', 'breeze_clear_all_cache')) {
+            \Breeze_Admin::breeze_clear_all_cache(true);
+        }
     }
 
     /**
