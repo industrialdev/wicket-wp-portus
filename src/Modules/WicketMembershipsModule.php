@@ -20,6 +20,10 @@ class WicketMembershipsModule implements ConfigModuleInterface
     private const OPTION_KEY = 'wicket_membership_plugin_options';
     private const POST_TYPE = 'wicket_mship_config';
 
+    /**
+     * @param WordPressOptionReader     $reader   WordPress options reader.
+     * @param HyperfieldsOptionTransfer $transfer HyperFields transfer adapter.
+     */
     public function __construct(
         private readonly WordPressOptionReader $reader,
         private readonly HyperfieldsOptionTransfer $transfer
@@ -59,7 +63,7 @@ class WicketMembershipsModule implements ConfigModuleInterface
             }
 
             $post_rows[] = [
-                'id' => (int) $post->ID,
+                '__strategy' => 'replace',
                 'post_type' => (string) $post->post_type,
                 'post_name' => (string) $post->post_name,
                 'post_title' => (string) $post->post_title,

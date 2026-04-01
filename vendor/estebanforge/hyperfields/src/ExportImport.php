@@ -44,6 +44,17 @@ class ExportImport
 
     /** @var array<int, string> */
     private const SUPPORTED_IMPORT_MODES = ['merge', 'replace'];
+    private const STRATEGY_KEY = '__strategy';
+    private const SUPPORTED_NODE_STRATEGIES = [
+        'merge',
+        'replace',
+        'override',
+        'migrate',
+        'create',
+        'skip',
+        'delete',
+        'recreate',
+    ];
 
     /**
      * Export one or more WordPress option groups to a JSON string.
@@ -82,7 +93,9 @@ class ExportImport
             }
 
             $schema = $schemaMap[$optionName] ?? null;
-            $data[$optionName] = self::wrapTypedNode($value, $schema);
+            $node = self::wrapTypedNode($value, $schema);
+            $node = self::attachExportStrategy($node, $optionName, $value);
+            $data[$optionName] = $node;
         }
 
         $payload = [
@@ -180,6 +193,17 @@ class ExportImport
                 continue;
             }
 
+            $nodeStrategy = self::resolveNodeStrategy($incoming);
+            if ($nodeStrategy === 'skip') {
+                continue;
+            }
+
+            if ($nodeStrategy === 'delete') {
+                delete_option($optionName);
+                $importedCount++;
+                continue;
+            }
+
             // Unwrap the typed node to get the raw value for storage.
             $incoming = $incoming['value'];
 
@@ -207,14 +231,25 @@ class ExportImport
             }
 
             // Backup existing value using a transient so it auto-expires
-            $existing = get_option($optionName, null);
+            $missingMarker = self::missingMarker();
+            $existing = get_option($optionName, $missingMarker);
+            $hasExisting = ($existing !== $missingMarker);
             if ($existing !== null && $existing !== []) {
                 $backupKey               = 'hf_backup_' . sanitize_key($optionName) . '_' . time();
                 set_transient($backupKey, $existing, HOUR_IN_SECONDS);
                 $backupKeys[$optionName] = $backupKey;
             }
 
-            $nextValue = self::buildNextOptionValue($existing, $incoming, $importMode);
+            if ($nodeStrategy === 'create' && $hasExisting) {
+                continue;
+            }
+
+            $effectiveMode = self::effectiveImportMode($importMode, $nodeStrategy);
+            if ($nodeStrategy === 'recreate' && $hasExisting) {
+                delete_option($optionName);
+            }
+
+            $nextValue = self::buildNextOptionValue($hasExisting ? $existing : null, $incoming, $effectiveMode);
 
             $updated = update_option($optionName, $nextValue);
             if ($updated || $existing === $nextValue) {
@@ -387,6 +422,12 @@ class ExportImport
                 continue;
             }
 
+            $nodeStrategy = self::resolveNodeStrategy($incoming);
+            if ($nodeStrategy === 'skip') {
+                $skipped[] = "Skipped '{$optionName}': strategy=skip.";
+                continue;
+            }
+
             $incoming = $incoming['value'];
 
             if (!is_array($incoming) && !is_scalar($incoming) && $incoming !== null) {
@@ -411,12 +452,34 @@ class ExportImport
                 continue;
             }
 
-            $existing = get_option($optionName, null);
-            $nextValue = self::buildNextOptionValue($existing, $incoming, $importMode);
-            if ($existing !== $nextValue) {
+            $missingMarker = self::missingMarker();
+            $existing = get_option($optionName, $missingMarker);
+            $hasExisting = ($existing !== $missingMarker);
+
+            if ($nodeStrategy === 'delete') {
+                if ($hasExisting) {
+                    $changes[$optionName] = [
+                        'before' => $existing,
+                        'after' => null,
+                        'strategy' => 'delete',
+                    ];
+                }
+                continue;
+            }
+
+            if ($nodeStrategy === 'create' && $hasExisting) {
+                $skipped[] = "Skipped '{$optionName}': strategy=create and option already exists.";
+                continue;
+            }
+
+            $effectiveMode = self::effectiveImportMode($importMode, $nodeStrategy);
+            $nextValue = self::buildNextOptionValue($hasExisting ? $existing : null, $incoming, $effectiveMode);
+            $beforeValue = $hasExisting ? $existing : null;
+            if ($beforeValue !== $nextValue) {
                 $changes[$optionName] = [
-                    'before' => $existing,
+                    'before' => $beforeValue,
                     'after' => $nextValue,
+                    'strategy' => $nodeStrategy !== '' ? $nodeStrategy : $effectiveMode,
                 ];
             }
         }
@@ -429,6 +492,11 @@ class ExportImport
         ];
     }
 
+    /**
+     * ResolveImportMode.
+     *
+     * @return string
+     */
     private static function resolveImportMode(array $options): string
     {
         $mode = isset($options['mode']) ? sanitize_text_field((string) $options['mode']) : 'merge';
@@ -439,6 +507,11 @@ class ExportImport
         return $mode;
     }
 
+    /**
+     * BuildNextOptionValue.
+     *
+     * @return mixed
+     */
     private static function buildNextOptionValue(mixed $existing, mixed $incoming, string $importMode): mixed
     {
         if (!is_array($incoming)) {
@@ -521,5 +594,66 @@ class ExportImport
         }
 
         return SchemaValidator::validate($optionName, $node['value'], $schema);
+    }
+
+    /**
+     * Returns a per-option import strategy from a typed node.
+     *
+     * @param array<string, mixed> $node
+     * @return string
+     */
+    private static function resolveNodeStrategy(array $node): string
+    {
+        $strategy = isset($node[self::STRATEGY_KEY]) ? sanitize_key((string) $node[self::STRATEGY_KEY]) : '';
+        if (!in_array($strategy, self::SUPPORTED_NODE_STRATEGIES, true)) {
+            return '';
+        }
+
+        return $strategy;
+    }
+
+    /**
+     * Resolves effective import mode from default mode + node strategy.
+     *
+     * @return string
+     */
+    private static function effectiveImportMode(string $importMode, string $nodeStrategy): string
+    {
+        return match ($nodeStrategy) {
+            'replace', 'override', 'recreate' => 'replace',
+            'merge', 'migrate', 'create' => 'merge',
+            default => $importMode,
+        };
+    }
+
+    /**
+     * Returns a unique marker used to detect missing options from get_option.
+     *
+     * @return object
+     */
+    private static function missingMarker(): object
+    {
+        return (object) ['__hf_missing' => true];
+    }
+
+    /**
+     * Attaches an optional export strategy to an option typed node.
+     *
+     * @param array<string, mixed> $node
+     * @param string $optionName
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    private static function attachExportStrategy(array $node, string $optionName, mixed $value): array
+    {
+        $strategy = apply_filters('hyperfields/export/node_strategy', 'replace', $optionName, $value);
+        $strategy = sanitize_key((string) $strategy);
+        if ($strategy === '' || !in_array($strategy, self::SUPPORTED_NODE_STRATEGIES, true)) {
+            return $node;
+        }
+
+        $node[self::STRATEGY_KEY] = $strategy;
+
+        return $node;
     }
 }

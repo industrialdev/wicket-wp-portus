@@ -42,6 +42,9 @@ class MyAccountPagesExportModule implements ConfigModuleInterface
         'change-password',
     ];
 
+    /**
+     * @param string $module_key Module key used in the manifest envelope.
+     */
     public function __construct(string $module_key = 'my_account_pages')
     {
         $this->module_key = $module_key;
@@ -82,7 +85,7 @@ class MyAccountPagesExportModule implements ConfigModuleInterface
             }
 
             $rows[] = [
-                'id' => (int) $post->ID,
+                '__strategy' => 'replace',
                 'post_type' => (string) $post->post_type,
                 'post_name' => (string) $post->post_name,
                 'post_title' => (string) $post->post_title,

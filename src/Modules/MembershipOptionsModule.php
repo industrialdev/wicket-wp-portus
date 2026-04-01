@@ -17,6 +17,10 @@ class MembershipOptionsModule implements ConfigModuleInterface, OptionGroupProvi
 {
     private const OPTION_KEY = 'wicket_membership_plugin_options';
 
+    /**
+     * @param WordPressOptionReader     $reader   WordPress options reader.
+     * @param HyperfieldsOptionTransfer $transfer HyperFields transfer adapter.
+     */
     public function __construct(
         private readonly WordPressOptionReader $reader,
         private readonly HyperfieldsOptionTransfer $transfer

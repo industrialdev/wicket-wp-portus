@@ -18,6 +18,9 @@ use WicketPortus\Registry\ModuleRegistry;
  */
 class TransferOrchestrator
 {
+    /**
+     * @param ModuleRegistry $registry Registered Portus modules.
+     */
     public function __construct(
         private readonly ModuleRegistry $registry
     ) {}
@@ -45,7 +48,7 @@ class TransferOrchestrator
     {
         $keys    = $this->resolve_module_keys($module_keys);
         $manager = $this->build_manager($keys);
-        $bundle  = $manager->export($keys);
+        $bundle  = $manager->export($keys, ['export_mode' => $mode]);
 
         // Unwrap the inner ['payload'] wrapper added by build_manager() exporters.
         $modules = [];
@@ -58,6 +61,10 @@ class TransferOrchestrator
                 if ($module instanceof SanitizableModuleInterface) {
                     $payload = $module->sanitize($payload);
                 }
+
+                if ($this->strip_database_ids_for_template_exports()) {
+                    $payload = $this->strip_database_ids($payload);
+                }
             }
 
             $modules[$module_key] = $payload;
@@ -69,6 +76,45 @@ class TransferOrchestrator
         // Return the full Manager envelope (which carries site, type, schema_version
         // from SchemaConfig) with the unwrapped module payloads substituted in.
         return array_merge($bundle, ['modules' => $modules]);
+    }
+
+    /**
+     * Returns whether template exports should remove numeric DB identifiers.
+     *
+     * @return bool
+     */
+    private function strip_database_ids_for_template_exports(): bool
+    {
+        return (bool) apply_filters('wicket_portus/export/template_strip_database_ids', true);
+    }
+
+    /**
+     * Removes numeric database IDs from post-like rows in a payload.
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    private function strip_database_ids(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        foreach ($value as $key => $item) {
+            $value[$key] = $this->strip_database_ids($item);
+        }
+
+        if (
+            array_key_exists('id', $value)
+            && isset($value['post_type'])
+            && isset($value['post_name'])
+            && isset($value['post_title'])
+            && is_numeric($value['id'])
+        ) {
+            unset($value['id']);
+        }
+
+        return $value;
     }
 
     /**
@@ -147,14 +193,14 @@ class TransferOrchestrator
 
             $manager->registerModule(
                 $module_key,
-                exporter: static fn (): array => ['payload' => $module->export()],
+                exporter: static fn (array $context = []): array => ['payload' => $module->export()],
                 importer: static fn (array $payload, array $context): array => $module
                     ->import(
                         is_array($payload['payload'] ?? null) ? $payload['payload'] : [],
                         ['dry_run' => (bool) ($context['dry_run'] ?? false)]
                     )
                     ->to_array(),
-                differ: static fn (array $payload): array => $module
+                differ: static fn (array $payload, array $context = []): array => $module
                     ->import(
                         is_array($payload['payload'] ?? null) ? $payload['payload'] : [],
                         ['dry_run' => true]

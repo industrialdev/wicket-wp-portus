@@ -48,6 +48,10 @@ class FinancialFieldsModule implements ConfigModuleInterface
         return array_keys(self::OPTION_SCHEMA);
     }
 
+    /**
+     * @param WordPressOptionReader     $reader   WordPress options reader.
+     * @param HyperfieldsOptionTransfer $transfer HyperFields transfer adapter.
+     */
     public function __construct(
         private readonly WordPressOptionReader $reader,
         private readonly HyperfieldsOptionTransfer $transfer

@@ -97,6 +97,10 @@ class WooCommerceEmailModule implements ConfigModuleInterface
         return $names;
     }
 
+    /**
+     * @param WordPressOptionReader     $reader   WordPress options reader.
+     * @param HyperfieldsOptionTransfer $transfer HyperFields transfer adapter.
+     */
     public function __construct(
         private readonly WordPressOptionReader $reader,
         private readonly HyperfieldsOptionTransfer $transfer,
@@ -106,6 +110,9 @@ class WooCommerceEmailModule implements ConfigModuleInterface
     //  ConfigModuleInterface
     // ──────────────────────────────────────────────────────────────────
 
+    /**
+     * @inheritdoc
+     */
     public function key(): string
     {
         return 'woocommerce_emails';
@@ -361,6 +368,12 @@ class WooCommerceEmailModule implements ConfigModuleInterface
     //  Typed-node + schema helpers
     // ──────────────────────────────────────────────────────────────────
 
+    /**
+     * Returns whether a value uses the typed-node envelope format.
+     *
+     * @param mixed $node Candidate manifest node.
+     * @return bool
+     */
     private static function is_typed_node(mixed $node): bool
     {
         return is_array($node)
@@ -446,11 +459,23 @@ class WooCommerceEmailModule implements ConfigModuleInterface
         ];
     }
 
+    /**
+     * Builds the wp_options key used for a specific WooCommerce email ID.
+     *
+     * @param string $email_id WooCommerce email identifier.
+     * @return string
+     */
     private function email_option_name(string $email_id): string
     {
         return 'woocommerce_' . $email_id . '_settings';
     }
 
+    /**
+     * Validates that an email ID is safe for option-name composition.
+     *
+     * @param string $email_id Candidate ID.
+     * @return bool
+     */
     private function is_valid_email_id(string $email_id): bool
     {
         return (bool) preg_match('/^[a-z0-9_]+$/', $email_id);
@@ -460,6 +485,12 @@ class WooCommerceEmailModule implements ConfigModuleInterface
     //  Utility
     // ──────────────────────────────────────────────────────────────────
 
+    /**
+     * Converts an option name into a human-readable label.
+     *
+     * @param string $option_name Option key.
+     * @return string
+     */
     private function humanize_option_name(string $option_name): string
     {
         $name = str_replace('woocommerce_email_', '', $option_name);
@@ -467,6 +498,12 @@ class WooCommerceEmailModule implements ConfigModuleInterface
         return ucwords(str_replace('_', ' ', $name));
     }
 
+    /**
+     * Converts an email ID into a human-readable label.
+     *
+     * @param string $email_id Email identifier.
+     * @return string
+     */
     private function humanize_email_id(string $email_id): string
     {
         return ucwords(str_replace('_', ' ', $email_id));

@@ -32,6 +32,10 @@ class ThemeAcfOptionsModule implements ConfigModuleInterface, OptionGroupProvide
         return is_array($patterns) ? $patterns : [];
     }
 
+    /**
+     * @param WordPressOptionReader     $reader   WordPress options reader.
+     * @param HyperfieldsOptionTransfer $transfer HyperFields transfer adapter.
+     */
     public function __construct(
         private readonly WordPressOptionReader $reader,
         private readonly HyperfieldsOptionTransfer $transfer

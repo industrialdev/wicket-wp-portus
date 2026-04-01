@@ -127,7 +127,8 @@ final class AuditLogStorage
                 'payload_hash' => sanitize_text_field((string) ($event['payload_hash'] ?? '')),
                 'error_summary' => sanitize_textarea_field((string) ($event['error_summary'] ?? '')),
                 'context' => wp_json_encode($context),
-                'created_at' => gmdate('Y-m-d H:i:s'),
+                // Store in site-local WordPress time so operators see timezone-consistent logs.
+                'created_at' => self::siteDateTime(),
             ],
             [
                 '%s',
@@ -181,7 +182,8 @@ final class AuditLogStorage
 
         $retentionDays = self::retentionDays();
         $cutoffUnix = time() - ($retentionDays * DAY_IN_SECONDS);
-        $cutoff = gmdate('Y-m-d H:i:s', $cutoffUnix);
+        // Match the storage timezone (WordPress site-local time).
+        $cutoff = self::siteDateTime($cutoffUnix);
         $table = self::tableName();
         $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE created_at < %s", $cutoff)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
@@ -250,6 +252,11 @@ final class AuditLogStorage
         ];
     }
 
+    /**
+     * Runs the table migration using WordPress `dbDelta`.
+     *
+     * @return void
+     */
     private static function runMigration(): void
     {
         global $wpdb;
@@ -295,6 +302,11 @@ KEY user_id (user_id)
         dbDelta($sql);
     }
 
+    /**
+     * Returns whether the audit table exists in the active WordPress database.
+     *
+     * @return bool
+     */
     private static function tableExists(): bool
     {
         global $wpdb;
@@ -308,6 +320,11 @@ KEY user_id (user_id)
         return is_string($found) && $found === $table;
     }
 
+    /**
+     * Builds the fully-qualified transfer logs table name.
+     *
+     * @return string
+     */
     private static function tableName(): string
     {
         global $wpdb;
@@ -318,6 +335,11 @@ KEY user_id (user_id)
         return $wpdb->prefix . self::TABLE_SLUG;
     }
 
+    /**
+     * Resolves retention days from filter and applies a safe minimum.
+     *
+     * @return int
+     */
     private static function retentionDays(): int
     {
         $days = self::DEFAULT_RETENTION_DAYS;
@@ -328,6 +350,11 @@ KEY user_id (user_id)
         return max(1, $days);
     }
 
+    /**
+     * Resolves prune interval from filter and applies a safe minimum.
+     *
+     * @return int
+     */
     private static function pruneIntervalSeconds(): int
     {
         $seconds = self::DEFAULT_PRUNE_INTERVAL_SECONDS;
@@ -336,5 +363,26 @@ KEY user_id (user_id)
         }
 
         return max(60, $seconds);
+    }
+
+    /**
+     * Formats a timestamp using the WordPress site timezone.
+     *
+     * @param int|null $timestamp Unix timestamp, defaults to current time.
+     * @return string
+     */
+    private static function siteDateTime(?int $timestamp = null): string
+    {
+        $timestamp = $timestamp ?? time();
+
+        if (function_exists('wp_date')) {
+            return wp_date('Y-m-d H:i:s', $timestamp);
+        }
+
+        if (function_exists('current_time') && $timestamp === time()) {
+            return (string) current_time('mysql');
+        }
+
+        return date('Y-m-d H:i:s', $timestamp);
     }
 }

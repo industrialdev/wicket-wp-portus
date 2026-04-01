@@ -23,6 +23,7 @@ class ContentExportImport
     ];
 
     private const WP_OBJECT_OUTPUT = 'OBJECT';
+    private const STRATEGY_KEY = '__strategy';
 
     /**
      * Export posts/pages/CPT records to a JSON payload.
@@ -221,26 +222,137 @@ class ContentExportImport
                 continue;
             }
 
-            $existing = get_page_by_path($slug, self::WP_OBJECT_OUTPUT, $postType);
+            $existing = self::resolveExistingPost($row, $postType, $slug);
             $hasExisting = is_object($existing) && isset($existing->ID);
             $postData = self::buildImportPostData($row, $postType, $slug, $settings);
+            $targetId = $hasExisting ? (int) $existing->ID : 0;
+            $decision = self::applyRowDecisionFilter(
+                hasExisting: $hasExisting,
+                targetId: $targetId,
+                createMissing: $createMissing,
+                updateExisting: $updateExisting,
+                row: $row,
+                postType: $postType,
+                slug: $slug,
+                options: $options
+            );
 
-            $targetId = 0;
-            if ($hasExisting) {
-                $targetId = (int) $existing->ID;
-                if (!$updateExisting) {
+            if ($decision['action'] === 'skip') {
+                $stats['skipped']++;
+                $actions[] = [
+                    'action' => 'skip',
+                    'post_type' => $postType,
+                    'slug' => $slug,
+                    'reason' => (string) ($decision['reason'] ?? 'custom_rule'),
+                ];
+                continue;
+            }
+
+            if ($decision['action'] === 'recreate') {
+                if ($targetId > 0) {
+                    if ($dryRun) {
+                        $actions[] = [
+                            'action' => 'delete',
+                            'post_type' => $postType,
+                            'slug' => $slug,
+                            'dry_run' => true,
+                        ];
+                    } else {
+                        $deleted = wp_delete_post($targetId, true);
+                        if (!$deleted) {
+                            $stats['skipped']++;
+                            $errors[] = 'Failed deleting ' . $postType . ':' . $slug . ' - unknown error.';
+                            continue;
+                        }
+                    }
+                }
+
+                if ($dryRun) {
+                    $stats['created']++;
+                    $actions[] = [
+                        'action' => 'recreate',
+                        'post_type' => $postType,
+                        'slug' => $slug,
+                        'dry_run' => true,
+                    ];
+                    continue;
+                }
+
+                $created = wp_insert_post($postData, true);
+                if (self::isWpError($created)) {
+                    $stats['skipped']++;
+                    $errors[] = 'Failed recreating ' . $postType . ':' . $slug . ' - ' . self::wpErrorMessage($created);
+                    continue;
+                }
+                $targetId = (int) $created;
+                $stats['created']++;
+                $actions[] = [
+                    'action' => 'recreate',
+                    'post_type' => $postType,
+                    'slug' => $slug,
+                    'id' => $targetId,
+                ];
+                continue;
+            }
+
+            if ($decision['action'] === 'delete') {
+                if ($targetId <= 0) {
                     $stats['skipped']++;
                     $actions[] = [
                         'action' => 'skip',
                         'post_type' => $postType,
                         'slug' => $slug,
-                        'reason' => 'update_disabled',
+                        'reason' => 'delete_target_missing',
                     ];
                     continue;
                 }
 
+                if ($dryRun) {
+                    $stats['updated']++;
+                    $actions[] = [
+                        'action' => 'delete',
+                        'post_type' => $postType,
+                        'slug' => $slug,
+                        'dry_run' => true,
+                    ];
+                } else {
+                    $deleted = wp_delete_post($targetId, true);
+                    if (!$deleted) {
+                        $stats['skipped']++;
+                        $errors[] = 'Failed deleting ' . $postType . ':' . $slug . ' - unknown error.';
+                        continue;
+                    }
+                    $stats['updated']++;
+                    $actions[] = [
+                        'action' => 'delete',
+                        'post_type' => $postType,
+                        'slug' => $slug,
+                        'id' => $targetId,
+                    ];
+                }
+                continue;
+            }
+
+            if ($decision['action'] === 'merge') {
+                $targetId = max(0, (int) ($decision['target_id'] ?? $targetId));
+                if ($targetId <= 0) {
+                    $stats['skipped']++;
+                    $errors[] = 'Skipped merge for ' . $postType . ':' . $slug . ' - no target ID resolved.';
+                    continue;
+                }
+
+                $updateTarget = (is_object($existing) && isset($existing->ID) && (int) $existing->ID === $targetId)
+                    ? $existing
+                    : get_post($targetId, self::WP_OBJECT_OUTPUT);
+
+                if (!is_object($updateTarget) || !isset($updateTarget->ID)) {
+                    $stats['skipped']++;
+                    $errors[] = 'Skipped merge for ' . $postType . ':' . $slug . ' - target post not found.';
+                    continue;
+                }
+
                 $postData['ID'] = $targetId;
-                $needsUpdate = self::postNeedsUpdate($existing, $postData);
+                $needsUpdate = self::postNeedsUpdate($updateTarget, $postData);
                 if (!$needsUpdate) {
                     $stats['unchanged']++;
                     $actions[] = [
@@ -251,7 +363,7 @@ class ContentExportImport
                 } elseif ($dryRun) {
                     $stats['updated']++;
                     $actions[] = [
-                        'action' => 'update',
+                        'action' => 'merge',
                         'post_type' => $postType,
                         'slug' => $slug,
                         'dry_run' => true,
@@ -265,24 +377,13 @@ class ContentExportImport
                     }
                     $stats['updated']++;
                     $actions[] = [
-                        'action' => 'update',
+                        'action' => 'merge',
                         'post_type' => $postType,
                         'slug' => $slug,
                         'id' => $targetId,
                     ];
                 }
             } else {
-                if (!$createMissing) {
-                    $stats['skipped']++;
-                    $actions[] = [
-                        'action' => 'skip',
-                        'post_type' => $postType,
-                        'slug' => $slug,
-                        'reason' => 'create_disabled',
-                    ];
-                    continue;
-                }
-
                 if ($dryRun) {
                     $stats['created']++;
                     $actions[] = [
@@ -373,6 +474,11 @@ class ContentExportImport
         do_action('hyperfields/content_import/after', $result, $decoded, $options);
     }
 
+    /**
+     * NormalizeExportPost.
+     *
+     * @return ?array
+     */
     private static function normalizeExportPost(mixed $post, array $settings): ?array
     {
         if (!is_object($post) || !isset($post->ID, $post->post_type, $post->post_name)) {
@@ -382,6 +488,7 @@ class ContentExportImport
         $postId = (int) $post->ID;
         $export = [
             'id' => $postId,
+            self::STRATEGY_KEY => self::exportRowStrategy($post),
             'post_type' => sanitize_key((string) $post->post_type),
             'slug' => sanitize_title((string) $post->post_name),
             'title' => (string) ($post->post_title ?? ''),
@@ -452,6 +559,248 @@ class ContentExportImport
         }
 
         return $postData;
+    }
+
+    /**
+     * Resolves an existing destination post for an incoming row.
+     *
+     * Matching order:
+     * 1) If incoming `id` exists, resolve destination post by ID and confirm
+     *    both post_type and slug match.
+     * 2) Fallback to canonical post_type + slug lookup.
+     *
+     * @param array<string, mixed> $row
+     * @return object|null
+     */
+    private static function resolveExistingPost(array $row, string $postType, string $slug): ?object
+    {
+        $resolved = null;
+
+        $incomingId = isset($row['id']) ? max(0, (int) $row['id']) : 0;
+        if ($incomingId > 0) {
+            $byId = get_post($incomingId, self::WP_OBJECT_OUTPUT);
+            if (
+                is_object($byId)
+                && isset($byId->ID, $byId->post_type, $byId->post_name)
+                && (int) $byId->ID === $incomingId
+                && sanitize_key((string) $byId->post_type) === $postType
+                && sanitize_title((string) $byId->post_name) === $slug
+            ) {
+                $resolved = $byId;
+            }
+        }
+
+        if ($resolved === null) {
+            $bySlug = get_page_by_path($slug, self::WP_OBJECT_OUTPUT, $postType);
+            if (is_object($bySlug) && isset($bySlug->ID)) {
+                $resolved = $bySlug;
+            }
+        }
+
+        /**
+         * Filters resolved existing post candidate for an import row.
+         *
+         * Return an object with an `ID` property, a numeric ID, or null.
+         *
+         * @param object|int|null $resolved Resolved post candidate (default ID+slug then slug fallback).
+         * @param array           $row      Incoming content row.
+         * @param string          $postType Sanitized post type.
+         * @param string          $slug     Sanitized slug.
+         */
+        $filtered = apply_filters('hyperfields/content_import/resolve_existing_post', $resolved, $row, $postType, $slug);
+        if (is_numeric($filtered)) {
+            $filtered = get_post((int) $filtered, self::WP_OBJECT_OUTPUT);
+        }
+        if (is_object($filtered) && isset($filtered->ID)) {
+            return $filtered;
+        }
+
+        return null;
+    }
+
+    /**
+     * Applies row-level decision filter for create/merge/skip behavior.
+     *
+     * @param bool  $hasExisting
+     * @param int   $targetId
+     * @param bool  $createMissing
+     * @param bool  $updateExisting
+     * @param array $row
+     * @param string $postType
+     * @param string $slug
+     * @param array $options
+     * @return array{action: string, target_id: int, reason: string}
+     */
+    private static function applyRowDecisionFilter(
+        bool $hasExisting,
+        int $targetId,
+        bool $createMissing,
+        bool $updateExisting,
+        array $row,
+        string $postType,
+        string $slug,
+        array $options,
+    ): array {
+        $defaultDecision = self::defaultRowDecision(
+            hasExisting: $hasExisting,
+            targetId: $targetId,
+            createMissing: $createMissing,
+            updateExisting: $updateExisting,
+            rowStrategy: self::resolveRowStrategy($row)
+        );
+
+        /**
+         * Filters the import decision for one content row.
+         *
+         * Supports custom matching and policy rules:
+         * - `action`: `create`, `merge`, `delete`, `recreate`, or `skip`
+         * - `target_id`: numeric destination post ID (used for `merge`)
+         * - `reason`: optional skip reason for reporting
+         *
+         * @param array  $decision Default row decision.
+         * @param array  $row      Incoming content row.
+         * @param string $postType Sanitized post type.
+         * @param string $slug     Sanitized slug.
+         * @param array  $options  Raw import options.
+         */
+        $filtered = apply_filters(
+            'hyperfields/content_import/row_decision',
+            $defaultDecision,
+            $row,
+            $postType,
+            $slug,
+            $options
+        );
+
+        if (!is_array($filtered)) {
+            return $defaultDecision;
+        }
+
+        $action = isset($filtered['action']) ? sanitize_key((string) $filtered['action']) : $defaultDecision['action'];
+        if (!in_array($action, ['create', 'merge', 'skip', 'delete', 'recreate'], true)) {
+            $action = $defaultDecision['action'];
+        }
+
+        return [
+            'action' => $action,
+            'target_id' => isset($filtered['target_id']) ? max(0, (int) $filtered['target_id']) : $defaultDecision['target_id'],
+            'reason' => isset($filtered['reason']) ? sanitize_key((string) $filtered['reason']) : $defaultDecision['reason'],
+        ];
+    }
+
+    /**
+     * Builds the default create/merge/skip decision for a content row.
+     *
+     * @return array{action: string, target_id: int, reason: string}
+     */
+    private static function defaultRowDecision(
+        bool $hasExisting,
+        int $targetId,
+        bool $createMissing,
+        bool $updateExisting,
+        string $rowStrategy = ''
+    ): array
+    {
+        if ($rowStrategy === 'skip') {
+            return [
+                'action' => 'skip',
+                'target_id' => $targetId,
+                'reason' => 'strategy_skip',
+            ];
+        }
+
+        if ($rowStrategy === 'delete') {
+            return [
+                'action' => 'delete',
+                'target_id' => $targetId,
+                'reason' => '',
+            ];
+        }
+
+        if ($rowStrategy === 'recreate') {
+            return [
+                'action' => 'recreate',
+                'target_id' => $targetId,
+                'reason' => '',
+            ];
+        }
+
+        if (in_array($rowStrategy, ['create', 'new'], true)) {
+            return [
+                'action' => 'create',
+                'target_id' => 0,
+                'reason' => '',
+            ];
+        }
+
+        if (in_array($rowStrategy, ['override', 'replace', 'migrate', 'merge'], true)) {
+            if ($hasExisting) {
+                return [
+                    'action' => 'merge',
+                    'target_id' => $targetId,
+                    'reason' => '',
+                ];
+            }
+        }
+
+        if ($hasExisting) {
+            if (!$updateExisting) {
+                return [
+                    'action' => 'skip',
+                    'target_id' => $targetId,
+                    'reason' => 'update_disabled',
+                ];
+            }
+
+            return [
+                'action' => 'merge',
+                'target_id' => $targetId,
+                'reason' => '',
+            ];
+        }
+
+        if (!$createMissing) {
+            return [
+                'action' => 'skip',
+                'target_id' => 0,
+                'reason' => 'create_disabled',
+            ];
+        }
+
+        return [
+            'action' => 'create',
+            'target_id' => 0,
+            'reason' => '',
+        ];
+    }
+
+    /**
+     * Resolves row strategy from incoming content row.
+     *
+     * @param array<string, mixed> $row
+     * @return string
+     */
+    private static function resolveRowStrategy(array $row): string
+    {
+        if (!isset($row[self::STRATEGY_KEY])) {
+            return '';
+        }
+
+        return sanitize_key((string) $row[self::STRATEGY_KEY]);
+    }
+
+    /**
+     * Resolves the export strategy attached to each row.
+     *
+     * @param object $post
+     * @return string
+     */
+    private static function exportRowStrategy(object $post): string
+    {
+        $strategy = apply_filters('hyperfields/content_export/row_strategy', 'replace', $post);
+        $strategy = sanitize_key((string) $strategy);
+
+        return $strategy !== '' ? $strategy : 'replace';
     }
 
     /**
@@ -683,11 +1032,21 @@ class ContentExportImport
         ];
     }
 
+    /**
+     * IsWpError.
+     *
+     * @return bool
+     */
     private static function isWpError(mixed $value): bool
     {
         return function_exists('is_wp_error') && is_wp_error($value);
     }
 
+    /**
+     * WpErrorMessage.
+     *
+     * @return string
+     */
     private static function wpErrorMessage(mixed $error): string
     {
         if (!is_object($error) || !method_exists($error, 'get_error_message')) {

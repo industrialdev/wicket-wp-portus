@@ -26,6 +26,10 @@ class WicketGfOptionsModule implements ConfigModuleInterface
         'wicket_gf_slug_mapping',
     ];
 
+    /**
+     * @param WordPressOptionReader     $reader   WordPress options reader.
+     * @param HyperfieldsOptionTransfer $transfer HyperFields transfer adapter.
+     */
     public function __construct(
         private readonly WordPressOptionReader $reader,
         private readonly HyperfieldsOptionTransfer $transfer

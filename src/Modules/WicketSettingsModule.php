@@ -24,6 +24,10 @@ class WicketSettingsModule implements ConfigModuleInterface, SanitizableModuleIn
 {
     private const OPTION_KEY = 'wicket_settings';
 
+    /**
+     * @param WordPressOptionReader     $reader   WordPress options reader.
+     * @param HyperfieldsOptionTransfer $transfer HyperFields transfer adapter.
+     */
     public function __construct(
         private readonly WordPressOptionReader $reader,
         private readonly HyperfieldsOptionTransfer $transfer

@@ -317,6 +317,11 @@ final class AuditLogger
         ];
     }
 
+    /**
+     * Detects the runtime source for the current transfer operation.
+     *
+     * @return string One of: cli, cron, ajax, admin, frontend.
+     */
     private static function source(): string
     {
         if (defined('WP_CLI') && WP_CLI) {
@@ -338,6 +343,13 @@ final class AuditLogger
         return 'frontend';
     }
 
+    /**
+     * Truncates text with multibyte support when available.
+     *
+     * @param string $text Input text.
+     * @param int    $maxLength Maximum output length.
+     * @return string
+     */
     private static function truncate(string $text, int $maxLength): string
     {
         if ($maxLength <= 0) {

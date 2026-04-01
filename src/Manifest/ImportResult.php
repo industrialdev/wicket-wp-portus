@@ -27,6 +27,9 @@ class ImportResult
 
     private bool $is_dry_run = true;
 
+    /**
+     * @param bool $is_dry_run True for simulated imports, false for real writes.
+     */
     private function __construct(bool $is_dry_run)
     {
         $this->is_dry_run = $is_dry_run;

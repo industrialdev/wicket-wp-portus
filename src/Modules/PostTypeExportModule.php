@@ -15,6 +15,10 @@ use WicketPortus\Manifest\ImportResult;
  */
 class PostTypeExportModule implements ConfigModuleInterface
 {
+    /**
+     * @param string $module_key Manifest module key.
+     * @param string $post_type  WordPress post type to export.
+     */
     public function __construct(
         private readonly string $module_key,
         private readonly string $post_type
@@ -49,7 +53,7 @@ class PostTypeExportModule implements ConfigModuleInterface
             }
 
             $rows[] = [
-                'id' => (int) $post->ID,
+                '__strategy' => 'replace',
                 'post_type' => (string) $post->post_type,
                 'post_name' => (string) $post->post_name,
                 'post_title' => (string) $post->post_title,
@@ -149,4 +153,3 @@ class PostTypeExportModule implements ConfigModuleInterface
         return $normalized;
     }
 }
-

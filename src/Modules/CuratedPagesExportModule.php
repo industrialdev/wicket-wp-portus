@@ -37,6 +37,9 @@ class CuratedPagesExportModule implements ConfigModuleInterface
         'donate',
     ];
 
+    /**
+     * @param string $module_key Module key used in the manifest envelope.
+     */
     public function __construct(string $module_key = 'curated_pages')
     {
         $this->module_key = $module_key;
@@ -77,7 +80,7 @@ class CuratedPagesExportModule implements ConfigModuleInterface
             }
 
             $rows[] = [
-                'id' => (int) $post->ID,
+                '__strategy' => 'replace',
                 'post_type' => (string) $post->post_type,
                 'post_name' => (string) $post->post_name,
                 'post_title' => (string) $post->post_title,

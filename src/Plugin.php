@@ -6,7 +6,6 @@ namespace WicketPortus;
 
 use HyperFields\Admin\ExportImportUI;
 use HyperFields\Admin\ExportImportPageConfig;
-use HyperFields\Transfer\AuditLogStorage;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
@@ -31,10 +30,8 @@ use WicketPortus\Support\WordPressOptionReader;
 class Plugin
 {
     private const MODULE_SELECTION_KEY_PREFIX = '__portus_module__';
-    private const LOGS_VIEW_QUERY_ARG = 'portus_view';
-    private const LOGS_VIEW_QUERY_VALUE = 'transfer_logs';
-    private const LOGS_PAGE_QUERY_ARG = 'paged';
-    private const LOGS_PER_PAGE = 25;
+    private const DEFERRED_PLUGIN_CHANGES_TRANSIENT = 'wicket_portus_deferred_plugin_changes';
+    private const IMPORT_RESULT_SOURCE = 'wicket_portus';
     private const DEVELOPER_ONLY_MODULE_KEYS = [
         'developer_wp_options_snapshot',
     ];
@@ -47,6 +44,9 @@ class Plugin
 
     private string $data_tools_hook_suffix = '';
 
+    /**
+     * Private constructor for singleton bootstrap.
+     */
     private function __construct() {}
 
     /**
@@ -83,6 +83,8 @@ class Plugin
 
         add_action('wicket_portus/import/after', [$this, 'on_import_after'], 10, 2);
         add_action('admin_init', [$this, 'maybe_apply_deferred_plugin_changes']);
+        add_filter('hyperfields/import/ui_notice_message', [$this, 'filter_portus_import_notice_message'], 10, 3);
+        add_filter('hyperfields/import/ui_notice_extra_html', [$this, 'filter_portus_import_notice_extra_html'], 10, 3);
 
         /*
          * Allows extensions to register additional modules.
@@ -176,12 +178,6 @@ class Plugin
     {
         if (!current_user_can('manage_options')) {
             wp_die(esc_html__('You are not allowed to access this page.', 'wicket-portus'));
-        }
-
-        if ($this->is_logs_view()) {
-            $this->render_transfer_logs_page();
-
-            return;
         }
 
         if (!class_exists(ExportImportUI::class)) {
@@ -307,7 +303,7 @@ class Plugin
                 ];
         };
 
-        $importer = static function (
+        $importer = function (
             string $jsonString,
             array $allowedImportOptions = [],
             string $prefix = '',
@@ -326,12 +322,18 @@ class Plugin
 
                 $result = $orchestrator->import($decoded, dry_run: false, module_keys: $module_keys);
                 $errors = $result['errors'] ?? [];
+                $queuedPluginChanges = $this->queued_plugin_change_count();
 
                 $import_result = [
                     'success' => empty($errors),
                     'message' => empty($errors)
                         ? __('Portus manifest imported successfully.', 'wicket-portus')
                         : implode(' ', array_map('strval', $errors)),
+                    'source' => self::IMPORT_RESULT_SOURCE,
+                    'meta' => [
+                        'module_count' => count($module_keys),
+                        'queued_plugin_changes' => $queuedPluginChanges,
+                    ],
                 ];
 
                 /**
@@ -349,6 +351,8 @@ class Plugin
                 } catch (\Throwable $e) {
                     error_log('wicket_portus/import/after hook error: ' . $e->getMessage());
                 }
+
+                $import_result['meta']['queued_plugin_changes'] = $this->queued_plugin_change_count();
 
                 return $import_result;
         };
@@ -371,7 +375,6 @@ class Plugin
         }
 
         echo ExportImportUI::renderConfigured($config);
-        echo $this->render_transfer_logs_link();
     }
 
     /**
@@ -703,150 +706,6 @@ class Plugin
         return (string) ob_get_clean();
     }
 
-    private function is_logs_view(): bool
-    {
-        $view = isset($_GET[self::LOGS_VIEW_QUERY_ARG]) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-            ? sanitize_text_field(wp_unslash($_GET[self::LOGS_VIEW_QUERY_ARG])) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-            : '';
-
-        return $view === self::LOGS_VIEW_QUERY_VALUE;
-    }
-
-    private function render_transfer_logs_link(): string
-    {
-        $url = add_query_arg(
-            [
-                'page' => 'wicket-portus-data-tools',
-                self::LOGS_VIEW_QUERY_ARG => self::LOGS_VIEW_QUERY_VALUE,
-            ],
-            admin_url('admin.php')
-        );
-
-        return '<div class="wrap hyperpress hyperpress-options-wrap"><p style="text-align:right;margin-top:12px;"><a href="' . esc_url($url) . '">' . esc_html__('View transfer logs', 'wicket-portus') . '</a></p></div>';
-    }
-
-    private function render_transfer_logs_page(): void
-    {
-        if (!class_exists(AuditLogStorage::class)) {
-            echo WarningPrinter::admin_notice(
-                __('HyperFields transfer log storage is not available.', 'wicket-portus'),
-                'error'
-            );
-
-            return;
-        }
-
-        AuditLogStorage::maybePruneExpired();
-
-        $page = isset($_GET[self::LOGS_PAGE_QUERY_ARG]) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-            ? max(1, (int) $_GET[self::LOGS_PAGE_QUERY_ARG]) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-            : 1;
-
-        $logs = AuditLogStorage::fetchPage($page, self::LOGS_PER_PAGE);
-        $backUrl = add_query_arg(
-            [
-                'page' => 'wicket-portus-data-tools',
-            ],
-            admin_url('admin.php')
-        );
-
-        $baseUrl = add_query_arg(
-            [
-                'page' => 'wicket-portus-data-tools',
-                self::LOGS_VIEW_QUERY_ARG => self::LOGS_VIEW_QUERY_VALUE,
-            ],
-            admin_url('admin.php')
-        );
-
-        ?>
-        <div class="wrap">
-            <h1><?php esc_html_e('Portus Transfer Logs', 'wicket-portus'); ?></h1>
-            <p><?php esc_html_e('Audit trail for HyperFields export/import activity. Older rows are pruned lazily based on retention policy.', 'wicket-portus'); ?></p>
-            <p><a href="<?php echo esc_url($backUrl); ?>">&larr; <?php esc_html_e('Back to Export / Import', 'wicket-portus'); ?></a></p>
-
-            <table class="widefat striped">
-                <thead>
-                    <tr>
-                        <th><?php esc_html_e('Date (UTC)', 'wicket-portus'); ?></th>
-                        <th><?php esc_html_e('Operation', 'wicket-portus'); ?></th>
-                        <th><?php esc_html_e('Status', 'wicket-portus'); ?></th>
-                        <th><?php esc_html_e('API', 'wicket-portus'); ?></th>
-                        <th><?php esc_html_e('Source', 'wicket-portus'); ?></th>
-                        <th><?php esc_html_e('Records', 'wicket-portus'); ?></th>
-                        <th><?php esc_html_e('User', 'wicket-portus'); ?></th>
-                        <th><?php esc_html_e('Objects', 'wicket-portus'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php if (empty($logs['rows'])): ?>
-                    <tr>
-                        <td colspan="8"><?php esc_html_e('No transfer logs found.', 'wicket-portus'); ?></td>
-                    </tr>
-                <?php else: ?>
-                    <?php foreach ($logs['rows'] as $row): ?>
-                        <?php
-                        $userId = isset($row['user_id']) ? (int) $row['user_id'] : 0;
-                        $userLabel = $userId > 0 ? (string) $userId : __('System', 'wicket-portus');
-                        if ($userId > 0) {
-                            $user = get_userdata($userId);
-                            if ($user && isset($user->user_login)) {
-                                $userLabel = $user->user_login . ' (#' . $userId . ')';
-                            }
-                        }
-
-                        $objectsRaw = isset($row['object_keys']) ? (string) $row['object_keys'] : '';
-                        $objects = json_decode($objectsRaw, true);
-                        $objects = is_array($objects) ? array_values(array_map('strval', $objects)) : [];
-                        $objectsPreview = implode(', ', array_slice($objects, 0, 4));
-                        if (count($objects) > 4) {
-                            $objectsPreview .= ', …';
-                        }
-
-                        $rawStatus = sanitize_key((string) ($row['status'] ?? ''));
-                        $statusLabel = $rawStatus === 'success' ? 'success' : 'error';
-                        $errorSummary = (string) ($row['error_summary'] ?? '');
-                        ?>
-                        <tr>
-                            <td><?php echo esc_html((string) ($row['created_at'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($row['operation'] ?? '')); ?></td>
-                            <td title="<?php echo esc_attr($errorSummary); ?>"><?php echo esc_html($statusLabel); ?></td>
-                            <td><?php echo esc_html((string) ($row['api'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($row['source'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($row['records_count'] ?? '0')); ?></td>
-                            <td><?php echo esc_html($userLabel); ?></td>
-                            <td><?php echo esc_html($objectsPreview); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-                </tbody>
-            </table>
-
-            <?php
-            $pagination = paginate_links(
-                [
-                    'base' => add_query_arg(self::LOGS_PAGE_QUERY_ARG, '%#%', $baseUrl),
-                    'format' => '',
-                    'current' => (int) ($logs['page'] ?? 1),
-                    'total' => (int) ($logs['total_pages'] ?? 1),
-                    'type' => 'array',
-                    'prev_text' => __('« Previous', 'wicket-portus'),
-                    'next_text' => __('Next »', 'wicket-portus'),
-                ]
-            );
-            if (is_array($pagination) && !empty($pagination)):
-                ?>
-                <div class="tablenav" style="margin-top:12px;">
-                    <div class="tablenav-pages">
-                        <?php foreach ($pagination as $pageLink): ?>
-                            <?php echo wp_kses_post($pageLink); ?>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-        </div>
-        <?php
-    }
-
     /**
      * Runs post-import side-effects after a successful Portus manifest import.
      *
@@ -925,7 +784,7 @@ class Plugin
             return;
         }
 
-        set_transient('wicket_portus_deferred_plugin_changes', [
+        set_transient(self::DEFERRED_PLUGIN_CHANGES_TRANSIENT, [
             'activate'   => $to_activate,
             'deactivate' => $to_deactivate,
         ], 60);
@@ -941,12 +800,16 @@ class Plugin
      */
     public function maybe_apply_deferred_plugin_changes(): void
     {
-        $changes = get_transient('wicket_portus_deferred_plugin_changes');
+        $changes = get_transient(self::DEFERRED_PLUGIN_CHANGES_TRANSIENT);
         if (!is_array($changes)) {
             return;
         }
 
-        delete_transient('wicket_portus_deferred_plugin_changes');
+        if (!current_user_can('activate_plugins')) {
+            return;
+        }
+
+        delete_transient(self::DEFERRED_PLUGIN_CHANGES_TRANSIENT);
 
         if (!function_exists('activate_plugin')) {
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
@@ -962,6 +825,107 @@ class Plugin
         foreach ($to_activate as $plugin_file) {
             activate_plugin((string) $plugin_file, '', false, true);
         }
+    }
+
+    /**
+     * Customizes the HyperFields import notice message for Portus imports.
+     *
+     * @param string $message
+     * @param array $importResult
+     * @param bool $importSuccess
+     * @return string
+     */
+    public function filter_portus_import_notice_message(string $message, array $importResult, bool $importSuccess): string
+    {
+        if (!$this->is_portus_import_result($importResult)) {
+            return $message;
+        }
+
+        if (!$importSuccess) {
+            return $message;
+        }
+
+        $queued = $this->extract_queued_plugin_change_count($importResult);
+        if ($queued <= 0) {
+            return $message;
+        }
+
+        return sprintf(
+            __('%1$s Plugin synchronization is queued (%2$d change(s)) and will be applied on the next admin request.', 'wicket-portus'),
+            $message,
+            $queued
+        );
+    }
+
+    /**
+     * Appends structured metadata under the HyperFields import notice for Portus imports.
+     *
+     * @param string $extraHtml
+     * @param array $importResult
+     * @param bool $importSuccess
+     * @return string
+     */
+    public function filter_portus_import_notice_extra_html(string $extraHtml, array $importResult, bool $importSuccess): string
+    {
+        if (!$this->is_portus_import_result($importResult)) {
+            return $extraHtml;
+        }
+
+        $moduleCount = isset($importResult['meta']['module_count']) ? (int) $importResult['meta']['module_count'] : 0;
+        $queued = $this->extract_queued_plugin_change_count($importResult);
+
+        $rows = [];
+        if ($moduleCount > 0) {
+            $rows[] = '<li>' . esc_html(sprintf(__('Modules processed: %d', 'wicket-portus'), $moduleCount)) . '</li>';
+        }
+
+        if ($queued > 0) {
+            $rows[] = '<li>' . esc_html(sprintf(__('Queued plugin activation/deactivation changes: %d', 'wicket-portus'), $queued)) . '</li>';
+        }
+
+        if (empty($rows)) {
+            return $extraHtml;
+        }
+
+        $list = '<ul style="margin:8px 0 0 18px;list-style:disc;">' . implode('', $rows) . '</ul>';
+
+        return $extraHtml . $list;
+    }
+
+    /**
+     * @param array<string, mixed> $importResult
+     */
+    private function is_portus_import_result(array $importResult): bool
+    {
+        return isset($importResult['source']) && (string) $importResult['source'] === self::IMPORT_RESULT_SOURCE;
+    }
+
+    /**
+     * @param array<string, mixed> $importResult
+     */
+    private function extract_queued_plugin_change_count(array $importResult): int
+    {
+        return isset($importResult['meta']['queued_plugin_changes'])
+            ? max(0, (int) $importResult['meta']['queued_plugin_changes'])
+            : 0;
+    }
+
+    /**
+     * Returns total queued plugin activation/deactivation changes.
+     *
+     * @return int
+     */
+    private function queued_plugin_change_count(): int
+    {
+        $changes = get_transient(self::DEFERRED_PLUGIN_CHANGES_TRANSIENT);
+        if (!is_array($changes)) {
+            return 0;
+        }
+
+        $activate = is_array($changes['activate'] ?? null) ? $changes['activate'] : [];
+        $deactivate = is_array($changes['deactivate'] ?? null) ? $changes['deactivate'] : [];
+
+        return count($activate) + count($deactivate);
     }
 
     /**

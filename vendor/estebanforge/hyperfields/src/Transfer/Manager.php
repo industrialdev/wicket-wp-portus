@@ -44,6 +44,15 @@ class Manager
         return $this;
     }
 
+    /**
+     * Registers an export/import module handler set.
+     *
+     * @param string        $key      Unique module key.
+     * @param callable      $exporter Export callback: fn(array $context): mixed.
+     * @param callable      $importer Import callback: fn(array $payload, array $context): mixed.
+     * @param callable|null $differ   Optional diff callback: fn(array $payload, array $context): mixed.
+     * @return void
+     */
     public function registerModule(string $key, callable $exporter, callable $importer, ?callable $differ = null): void
     {
         $normalizedKey = sanitize_key($key);
@@ -215,8 +224,49 @@ class Manager
                     continue;
                 }
 
+                $modulePayload = apply_filters(
+                    'hyperfields/transfer_manager/import/module_payload',
+                    $payload,
+                    $moduleKey,
+                    $context,
+                    $bundle
+                );
+
+                $moduleStrategy = self::resolveModuleStrategy($modulePayload);
+                $decision = apply_filters(
+                    'hyperfields/transfer_manager/import/module_decision',
+                    self::defaultModuleDecision($moduleStrategy),
+                    $moduleKey,
+                    $modulePayload,
+                    $context,
+                    $bundle
+                );
+
+                $action = is_array($decision) && isset($decision['action'])
+                    ? sanitize_key((string) $decision['action'])
+                    : 'import';
+                if ($action === 'skip') {
+                    $results[$moduleKey] = [
+                        'success' => true,
+                        'skipped' => true,
+                        'reason' => is_array($decision) && isset($decision['reason'])
+                            ? sanitize_text_field((string) $decision['reason'])
+                            : 'custom_rule',
+                    ];
+                    continue;
+                }
+
+                $moduleContext = apply_filters(
+                    'hyperfields/transfer_manager/import/module_context',
+                    array_merge($context, ['strategy' => $moduleStrategy !== '' ? $moduleStrategy : 'replace']),
+                    $moduleKey,
+                    $modulePayload,
+                    $bundle
+                );
+                $moduleContext = is_array($moduleContext) ? $moduleContext : $context;
+
                 try {
-                    $results[$moduleKey] = call_user_func($this->modules[$moduleKey]['importer'], $payload, $context);
+                    $results[$moduleKey] = call_user_func($this->modules[$moduleKey]['importer'], $modulePayload, $moduleContext);
                 } catch (\Throwable $throwable) {
                     $errors[] = "Module '{$moduleKey}' import failed: " . $throwable->getMessage();
                 }
@@ -263,5 +313,41 @@ class Manager
         }
 
         return array_values(array_unique($keys));
+    }
+
+    /**
+     * Resolves module strategy from module payload.
+     *
+     * @param mixed $modulePayload
+     * @return string
+     */
+    private static function resolveModuleStrategy(mixed $modulePayload): string
+    {
+        if (!is_array($modulePayload) || !isset($modulePayload['__strategy'])) {
+            return '';
+        }
+
+        return sanitize_key((string) $modulePayload['__strategy']);
+    }
+
+    /**
+     * Builds default import decision from module strategy.
+     *
+     * @param string $strategy
+     * @return array{action: string, reason: string}
+     */
+    private static function defaultModuleDecision(string $strategy): array
+    {
+        if ($strategy === 'skip') {
+            return [
+                'action' => 'skip',
+                'reason' => 'strategy_skip',
+            ];
+        }
+
+        return [
+            'action' => 'import',
+            'reason' => '',
+        ];
     }
 }
