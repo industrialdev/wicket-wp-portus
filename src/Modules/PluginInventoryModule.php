@@ -10,8 +10,9 @@ use WicketPortus\Manifest\ImportResult;
 /**
  * Exports plugin inventory and reports destination mismatches.
  *
- * Import does not activate/deactivate plugins in MVP; it only reports
- * missing plugins and version differences.
+ * Import validates the manifest and reports missing plugins / version
+ * differences. Actual activation/deactivation is performed post-import
+ * via the `wicket_portus/import/after` action in Plugin::on_import_after().
  */
 class PluginInventoryModule implements ConfigModuleInterface
 {
@@ -160,7 +161,7 @@ class PluginInventoryModule implements ConfigModuleInterface
                 );
             }
 
-            $result->add_skipped($plugin_file, 'activation/deactivation writes are deferred in MVP');
+            $result->add_skipped($plugin_file, 'activation/deactivation handled post-import via wicket_portus/import/after');
         }
 
         return $result;
