@@ -94,6 +94,7 @@ class FinancialFieldsModule implements ConfigModuleInterface
 
         if (!is_array($payload)) {
             $errors[] = 'financial_fields: payload must be an array.';
+
             return $errors;
         }
 
@@ -172,6 +173,7 @@ class FinancialFieldsModule implements ConfigModuleInterface
 
             if (!($diff['success'] ?? false)) {
                 $result->add_error((string) ($diff['message'] ?? 'financial_fields: dry-run diff failed.'));
+
                 return $result;
             }
 

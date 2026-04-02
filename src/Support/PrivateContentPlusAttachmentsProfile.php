@@ -93,6 +93,7 @@ final class PrivateContentPlusAttachmentsProfile
         if (self::is_wrapped_attachment_list($value)) {
             /** @var array<int, array<string, mixed>> $first */
             $first = $value[0];
+
             return $first;
         }
 
@@ -123,6 +124,7 @@ final class PrivateContentPlusAttachmentsProfile
         }
 
         $json = json_decode($value, true);
+
         return json_last_error() === JSON_ERROR_NONE ? $json : $value;
     }
 
@@ -167,4 +169,3 @@ final class PrivateContentPlusAttachmentsProfile
         return array_key_exists('attach_id', $value);
     }
 }
-

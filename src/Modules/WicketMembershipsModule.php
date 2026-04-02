@@ -114,6 +114,7 @@ class WicketMembershipsModule implements ConfigModuleInterface
 
             if (!($diff['success'] ?? false)) {
                 $result->add_error((string) ($diff['message'] ?? 'memberships: dry-run diff failed.'));
+
                 return $result;
             }
 

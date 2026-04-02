@@ -62,6 +62,7 @@ class ComposerStaticInitb4f3828c0666841b6fe71a826549a7c2
         'HyperFields\\Container\\TermMetaContainer' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/TermMetaContainer.php',
         'HyperFields\\Container\\UserMetaContainer' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/UserMetaContainer.php',
         'HyperFields\\ContentExportImport' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/ContentExportImport.php',
+        'HyperFields\\ContentTransferAdapter' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/ContentTransferAdapter.php',
         'HyperFields\\CustomField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/CustomField.php',
         'HyperFields\\ExportImport' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/ExportImport.php',
         'HyperFields\\Field' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Field.php',
@@ -108,6 +109,8 @@ class ComposerStaticInitb4f3828c0666841b6fe71a826549a7c2
         'WicketPortus\\Registry\\ModuleRegistry' => __DIR__ . '/../..' . '/src/Registry/ModuleRegistry.php',
         'WicketPortus\\Registry\\SensitiveFieldsRegistry' => __DIR__ . '/../..' . '/src/Registry/SensitiveFieldsRegistry.php',
         'WicketPortus\\Support\\HyperfieldsOptionTransfer' => __DIR__ . '/../..' . '/src/Support/HyperfieldsOptionTransfer.php',
+        'WicketPortus\\Support\\MembershipConfigContentProfile' => __DIR__ . '/../..' . '/src/Support/MembershipConfigContentProfile.php',
+        'WicketPortus\\Support\\PrivateContentPlusAttachmentsProfile' => __DIR__ . '/../..' . '/src/Support/PrivateContentPlusAttachmentsProfile.php',
         'WicketPortus\\Support\\WarningPrinter' => __DIR__ . '/../..' . '/src/Support/WarningPrinter.php',
         'WicketPortus\\Support\\WordPressOptionReader' => __DIR__ . '/../..' . '/src/Support/WordPressOptionReader.php',
     );

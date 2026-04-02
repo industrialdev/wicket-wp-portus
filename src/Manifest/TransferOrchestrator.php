@@ -49,7 +49,7 @@ class TransferOrchestrator
     public function export(array $module_keys = [], string $mode = 'full'): array
     {
         $started = microtime(true);
-        $keys    = $this->resolve_module_keys($module_keys);
+        $keys = $this->resolve_module_keys($module_keys);
         $this->log('info', 'Portus export started.', [
             'operation' => 'export',
             'export_mode' => $mode,
@@ -59,7 +59,7 @@ class TransferOrchestrator
         ]);
 
         $manager = $this->build_manager($keys);
-        $bundle  = $manager->export($keys, ['export_mode' => $mode]);
+        $bundle = $manager->export($keys, ['export_mode' => $mode]);
 
         // Unwrap the inner ['payload'] wrapper added by build_manager() exporters.
         $modules = [];
@@ -411,6 +411,7 @@ class TransferOrchestrator
 
             if (method_exists($logger, $level)) {
                 $logger->{$level}($message, $context);
+
                 return;
             }
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace WicketPortus;
 
-use HyperFields\Admin\ExportImportUI;
 use HyperFields\Admin\ExportImportPageConfig;
+use HyperFields\Admin\ExportImportUI;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
@@ -13,8 +13,8 @@ use WicketPortus\Modules\CuratedPagesExportModule;
 use WicketPortus\Modules\DeveloperWpOptionsSnapshotModule;
 use WicketPortus\Modules\FinancialFieldsModule;
 use WicketPortus\Modules\MyAccountPagesExportModule;
-use WicketPortus\Modules\PostTypeExportModule;
 use WicketPortus\Modules\PluginInventoryModule;
+use WicketPortus\Modules\PostTypeExportModule;
 use WicketPortus\Modules\WicketGfOptionsModule;
 use WicketPortus\Modules\WicketMembershipsModule;
 use WicketPortus\Modules\WicketSettingsModule;
@@ -275,39 +275,39 @@ class Plugin
             unset($prefix);
             $started = microtime(true);
 
-                $selected_module_keys = [];
-                foreach ($selectedNames as $selected_name) {
-                    $selected_name = (string) $selected_name;
-                    if (isset($selection_module_map[$selected_name])) {
-                        $selected_module_keys[] = (string) $selection_module_map[$selected_name];
-                    }
+            $selected_module_keys = [];
+            foreach ($selectedNames as $selected_name) {
+                $selected_name = (string) $selected_name;
+                if (isset($selection_module_map[$selected_name])) {
+                    $selected_module_keys[] = (string) $selection_module_map[$selected_name];
                 }
-                $selected_module_keys = array_values(array_unique($selected_module_keys));
+            }
+            $selected_module_keys = array_values(array_unique($selected_module_keys));
 
-                if ($export_mode === 'developer') {
-                    $selected_module_keys = $all_module_keys;
-                }
+            if ($export_mode === 'developer') {
+                $selected_module_keys = $all_module_keys;
+            }
 
-                $this->log_info('Portus export requested.', [
-                    'operation' => 'ui_export',
-                    'export_mode' => $export_mode,
-                    'selected_option_count' => count($selectedNames),
-                    'module_keys' => $selected_module_keys,
-                ]);
+            $this->log_info('Portus export requested.', [
+                'operation' => 'ui_export',
+                'export_mode' => $export_mode,
+                'selected_option_count' => count($selectedNames),
+                'module_keys' => $selected_module_keys,
+            ]);
 
-                $manifest = $orchestrator->export($selected_module_keys, $export_mode);
-                $encoded  = wp_json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $manifest = $orchestrator->export($selected_module_keys, $export_mode);
+            $encoded = wp_json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-                $this->log_info('Portus export response prepared.', [
-                    'operation' => 'ui_export',
-                    'export_mode' => $export_mode,
-                    'module_count' => count($selected_module_keys),
-                    'manifest_error_count' => is_array($manifest['errors'] ?? null) ? count($manifest['errors']) : 0,
-                    'json_size_bytes' => is_string($encoded) ? strlen($encoded) : 0,
-                    'duration_ms' => (int) round((microtime(true) - $started) * 1000),
-                ]);
+            $this->log_info('Portus export response prepared.', [
+                'operation' => 'ui_export',
+                'export_mode' => $export_mode,
+                'module_count' => count($selected_module_keys),
+                'manifest_error_count' => is_array($manifest['errors'] ?? null) ? count($manifest['errors']) : 0,
+                'json_size_bytes' => is_string($encoded) ? strlen($encoded) : 0,
+                'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+            ]);
 
-                return is_string($encoded) ? $encoded : '';
+            return is_string($encoded) ? $encoded : '';
         };
 
         $manifest_module_keys = static function (array $decoded): array {
@@ -338,52 +338,54 @@ class Plugin
             unset($allowedImportOptions, $prefix, $options);
             $started = microtime(true);
 
-                // Validate it looks like a Portus manifest.
-                if (!isset($decoded['modules']) || !is_array($decoded['modules'])) {
-                    $this->log_warning('Portus preview rejected invalid manifest (missing modules array).', [
-                        'operation' => 'ui_preview',
-                        'json_size_bytes' => strlen($jsonString),
-                    ]);
-                    return ['success' => false, 'message' => __('The uploaded file does not appear to be a valid Portus manifest.', 'wicket-portus')];
-                }
-
-                $module_keys = $manifest_module_keys($decoded);
-                if (empty($module_keys)) {
-                    $this->log_warning('Portus preview rejected manifest with no importable modules.', [
-                        'operation' => 'ui_preview',
-                        'json_size_bytes' => strlen($jsonString),
-                    ]);
-                    return ['success' => false, 'message' => __('The uploaded manifest does not contain any importable modules.', 'wicket-portus')];
-                }
-
-                $incoming_mode = isset($decoded['export_mode']) ? (string) $decoded['export_mode'] : 'full';
-                $incoming_mode = in_array($incoming_mode, ['template', 'full', 'developer'], true) ? $incoming_mode : 'full';
-
-                // current = what the orchestrator would export for the same module set (for diff display).
-                $current  = $orchestrator->export($module_keys, $incoming_mode);
-                $incoming = $decoded;
-
-                $current = $normalize_manifest_for_diff($current);
-                $incoming = $normalize_manifest_for_diff($incoming);
-
-                $transientKey = 'hf_import_preview_' . md5(wp_generate_uuid4());
-                set_transient($transientKey, $jsonString, 5 * MINUTE_IN_SECONDS);
-
-                $this->log_info('Portus preview prepared.', [
+            // Validate it looks like a Portus manifest.
+            if (!isset($decoded['modules']) || !is_array($decoded['modules'])) {
+                $this->log_warning('Portus preview rejected invalid manifest (missing modules array).', [
                     'operation' => 'ui_preview',
-                    'incoming_export_mode' => $incoming_mode,
-                    'module_keys' => $module_keys,
-                    'module_count' => count($module_keys),
                     'json_size_bytes' => strlen($jsonString),
-                    'duration_ms' => (int) round((microtime(true) - $started) * 1000),
                 ]);
 
-                return [
-                    'success'       => true,
-                    'transient_key' => $transientKey,
-                    'current'       => $current,
-                    'incoming'      => $incoming,
-                ];
+                return ['success' => false, 'message' => __('The uploaded file does not appear to be a valid Portus manifest.', 'wicket-portus')];
+            }
+
+            $module_keys = $manifest_module_keys($decoded);
+            if (empty($module_keys)) {
+                $this->log_warning('Portus preview rejected manifest with no importable modules.', [
+                    'operation' => 'ui_preview',
+                    'json_size_bytes' => strlen($jsonString),
+                ]);
+
+                return ['success' => false, 'message' => __('The uploaded manifest does not contain any importable modules.', 'wicket-portus')];
+            }
+
+            $incoming_mode = isset($decoded['export_mode']) ? (string) $decoded['export_mode'] : 'full';
+            $incoming_mode = in_array($incoming_mode, ['template', 'full', 'developer'], true) ? $incoming_mode : 'full';
+
+            // current = what the orchestrator would export for the same module set (for diff display).
+            $current = $orchestrator->export($module_keys, $incoming_mode);
+            $incoming = $decoded;
+
+            $current = $normalize_manifest_for_diff($current);
+            $incoming = $normalize_manifest_for_diff($incoming);
+
+            $transientKey = 'hf_import_preview_' . md5(wp_generate_uuid4());
+            set_transient($transientKey, $jsonString, 5 * MINUTE_IN_SECONDS);
+
+            $this->log_info('Portus preview prepared.', [
+                'operation' => 'ui_preview',
+                'incoming_export_mode' => $incoming_mode,
+                'module_keys' => $module_keys,
+                'module_count' => count($module_keys),
+                'json_size_bytes' => strlen($jsonString),
+                'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+            ]);
+
+            return [
+                'success'       => true,
+                'transient_key' => $transientKey,
+                'current'       => $current,
+                'incoming'      => $incoming,
+            ];
         };
 
         $importer = function (
@@ -394,75 +396,77 @@ class Plugin
             unset($allowedImportOptions, $prefix);
             $started = microtime(true);
 
-                $decoded = json_decode($jsonString, true);
-                if (!is_array($decoded) || !isset($decoded['modules'])) {
-                    $this->log_warning('Portus import rejected invalid manifest payload.', [
-                        'operation' => 'ui_import',
-                        'json_size_bytes' => strlen($jsonString),
-                    ]);
-                    return ['success' => false, 'message' => __('Import failed: invalid Portus manifest.', 'wicket-portus')];
-                }
-
-                $module_keys = $manifest_module_keys($decoded);
-                if (empty($module_keys)) {
-                    $this->log_warning('Portus import rejected manifest with no supported modules.', [
-                        'operation' => 'ui_import',
-                        'json_size_bytes' => strlen($jsonString),
-                    ]);
-                    return ['success' => false, 'message' => __('Import failed: no supported modules found in manifest.', 'wicket-portus')];
-                }
-
-                $this->log_info('Portus import requested.', [
+            $decoded = json_decode($jsonString, true);
+            if (!is_array($decoded) || !isset($decoded['modules'])) {
+                $this->log_warning('Portus import rejected invalid manifest payload.', [
                     'operation' => 'ui_import',
-                    'module_keys' => $module_keys,
-                    'module_count' => count($module_keys),
                     'json_size_bytes' => strlen($jsonString),
                 ]);
 
-                $result = $orchestrator->import($decoded, dry_run: false, module_keys: $module_keys);
-                $errors = $result['errors'] ?? [];
-                $queuedPluginChanges = $this->queued_plugin_change_count();
+                return ['success' => false, 'message' => __('Import failed: invalid Portus manifest.', 'wicket-portus')];
+            }
 
-                $import_result = [
-                    'success' => empty($errors),
-                    'message' => empty($errors)
-                        ? __('Portus manifest imported successfully.', 'wicket-portus')
-                        : implode(' ', array_map('strval', $errors)),
-                    'source' => self::IMPORT_RESULT_SOURCE,
-                    'meta' => [
-                        'module_count' => count($module_keys),
-                        'queued_plugin_changes' => $queuedPluginChanges,
-                    ],
-                ];
-
-                /**
-                 * Fires after a Portus manifest has been imported.
-                 *
-                 * Wrapped in try/catch so that exceptions or wp_redirect()+exit()
-                 * calls from post-import hook callbacks can never suppress the
-                 * success message shown to the operator.
-                 *
-                 * @param array $import_result Import result {success: bool, message: string}.
-                 * @param array $decoded       The full decoded Portus manifest.
-                 */
-                try {
-                    do_action('wicket_portus/import/after', $import_result, $decoded);
-                } catch (\Throwable $e) {
-                    $this->log_error('wicket_portus/import/after hook error: ' . $e->getMessage(), [
-                        'operation' => 'ui_import',
-                    ]);
-                }
-
-                $import_result['meta']['queued_plugin_changes'] = $this->queued_plugin_change_count();
-                $this->log($import_result['success'] ? 'info' : 'warning', 'Portus import completed.', [
+            $module_keys = $manifest_module_keys($decoded);
+            if (empty($module_keys)) {
+                $this->log_warning('Portus import rejected manifest with no supported modules.', [
                     'operation' => 'ui_import',
-                    'module_count' => count($module_keys),
-                    'error_count' => is_array($errors) ? count($errors) : 0,
-                    'queued_plugin_changes' => (int) ($import_result['meta']['queued_plugin_changes'] ?? 0),
-                    'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                    'json_size_bytes' => strlen($jsonString),
                 ]);
 
-                return $import_result;
+                return ['success' => false, 'message' => __('Import failed: no supported modules found in manifest.', 'wicket-portus')];
+            }
+
+            $this->log_info('Portus import requested.', [
+                'operation' => 'ui_import',
+                'module_keys' => $module_keys,
+                'module_count' => count($module_keys),
+                'json_size_bytes' => strlen($jsonString),
+            ]);
+
+            $result = $orchestrator->import($decoded, dry_run: false, module_keys: $module_keys);
+            $errors = $result['errors'] ?? [];
+            $queuedPluginChanges = $this->queued_plugin_change_count();
+
+            $import_result = [
+                'success' => empty($errors),
+                'message' => empty($errors)
+                    ? __('Portus manifest imported successfully.', 'wicket-portus')
+                    : implode(' ', array_map('strval', $errors)),
+                'source' => self::IMPORT_RESULT_SOURCE,
+                'meta' => [
+                    'module_count' => count($module_keys),
+                    'queued_plugin_changes' => $queuedPluginChanges,
+                ],
+            ];
+
+            /*
+             * Fires after a Portus manifest has been imported.
+             *
+             * Wrapped in try/catch so that exceptions or wp_redirect()+exit()
+             * calls from post-import hook callbacks can never suppress the
+             * success message shown to the operator.
+             *
+             * @param array $import_result Import result {success: bool, message: string}.
+             * @param array $decoded       The full decoded Portus manifest.
+             */
+            try {
+                do_action('wicket_portus/import/after', $import_result, $decoded);
+            } catch (\Throwable $e) {
+                $this->log_error('wicket_portus/import/after hook error: ' . $e->getMessage(), [
+                    'operation' => 'ui_import',
+                ]);
+            }
+
+            $import_result['meta']['queued_plugin_changes'] = $this->queued_plugin_change_count();
+            $this->log($import_result['success'] ? 'info' : 'warning', 'Portus import completed.', [
+                'operation' => 'ui_import',
+                'module_count' => count($module_keys),
+                'error_count' => is_array($errors) ? count($errors) : 0,
+                'queued_plugin_changes' => (int) ($import_result['meta']['queued_plugin_changes'] ?? 0),
+                'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+            ]);
+
+            return $import_result;
         };
 
         $config = new ExportImportPageConfig(
@@ -751,7 +755,7 @@ class Plugin
                 <label style="display: block; margin-bottom: 10px;">
                     <input type="radio" name="hf_export_mode" value="template"
                         <?php checked($current_mode, 'template'); ?>
-                        <?php checked($current_mode, ''); // Default to template if not set ?>>
+                        <?php checked($current_mode, ''); // Default to template if not set?>>
                     <strong><?php esc_html_e('Template (Safe for New Clients)', 'wicket-portus'); ?></strong>
                     <br>
                     <span class="description">
@@ -830,6 +834,7 @@ class Plugin
             $this->log_warning('Portus post-import hook skipped due to failed import result.', [
                 'operation' => 'post_import',
             ]);
+
             return;
         }
 
@@ -868,6 +873,7 @@ class Plugin
             $this->log_debug('Portus plugin inventory sync skipped: no site_inventory.plugins payload.', [
                 'operation' => 'plugin_inventory',
             ]);
+
             return;
         }
 
@@ -880,7 +886,7 @@ class Plugin
         $active_plugins = get_option('active_plugins', []);
         $active_plugins = is_array($active_plugins) ? $active_plugins : [];
 
-        $to_activate   = [];
+        $to_activate = [];
         $to_deactivate = [];
 
         foreach ($plugins as $plugin_row) {
@@ -888,7 +894,7 @@ class Plugin
                 continue;
             }
 
-            $plugin_file      = (string) ($plugin_row['plugin'] ?? '');
+            $plugin_file = (string) ($plugin_row['plugin'] ?? '');
             $should_be_active = (bool) ($plugin_row['active'] ?? false);
 
             if ($plugin_file === '' || $plugin_file === $self_basename) {
@@ -909,6 +915,7 @@ class Plugin
                 'operation' => 'plugin_inventory',
                 'plugin_rows' => count($plugins),
             ]);
+
             return;
         }
 
@@ -945,6 +952,7 @@ class Plugin
             $this->log_warning('Portus deferred plugin changes present but current user lacks activate_plugins.', [
                 'operation' => 'apply_deferred_plugins',
             ]);
+
             return;
         }
 
@@ -955,7 +963,7 @@ class Plugin
         }
 
         $to_deactivate = is_array($changes['deactivate'] ?? null) ? $changes['deactivate'] : [];
-        $to_activate   = is_array($changes['activate'] ?? null) ? $changes['activate'] : [];
+        $to_activate = is_array($changes['activate'] ?? null) ? $changes['activate'] : [];
 
         if (!empty($to_deactivate)) {
             deactivate_plugins($to_deactivate);
@@ -1212,6 +1220,7 @@ class Plugin
 
             if (method_exists($logger, $level)) {
                 $logger->{$level}($message, $context);
+
                 return;
             }
 

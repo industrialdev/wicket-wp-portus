@@ -165,5 +165,4 @@ class CuratedPagesExportModule implements ConfigModuleInterface
     {
         return self::CURATED_SLUGS;
     }
-
 }

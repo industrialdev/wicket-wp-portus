@@ -171,5 +171,4 @@ class MyAccountPagesExportModule implements ConfigModuleInterface
     {
         return self::CURATED_SLUGS;
     }
-
 }

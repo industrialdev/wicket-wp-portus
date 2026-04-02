@@ -33,6 +33,7 @@ return array(
     'HyperFields\\Container\\TermMetaContainer' => $vendorDir . '/estebanforge/hyperfields/src/Container/TermMetaContainer.php',
     'HyperFields\\Container\\UserMetaContainer' => $vendorDir . '/estebanforge/hyperfields/src/Container/UserMetaContainer.php',
     'HyperFields\\ContentExportImport' => $vendorDir . '/estebanforge/hyperfields/src/ContentExportImport.php',
+    'HyperFields\\ContentTransferAdapter' => $vendorDir . '/estebanforge/hyperfields/src/ContentTransferAdapter.php',
     'HyperFields\\CustomField' => $vendorDir . '/estebanforge/hyperfields/src/CustomField.php',
     'HyperFields\\ExportImport' => $vendorDir . '/estebanforge/hyperfields/src/ExportImport.php',
     'HyperFields\\Field' => $vendorDir . '/estebanforge/hyperfields/src/Field.php',
@@ -79,6 +80,8 @@ return array(
     'WicketPortus\\Registry\\ModuleRegistry' => $baseDir . '/src/Registry/ModuleRegistry.php',
     'WicketPortus\\Registry\\SensitiveFieldsRegistry' => $baseDir . '/src/Registry/SensitiveFieldsRegistry.php',
     'WicketPortus\\Support\\HyperfieldsOptionTransfer' => $baseDir . '/src/Support/HyperfieldsOptionTransfer.php',
+    'WicketPortus\\Support\\MembershipConfigContentProfile' => $baseDir . '/src/Support/MembershipConfigContentProfile.php',
+    'WicketPortus\\Support\\PrivateContentPlusAttachmentsProfile' => $baseDir . '/src/Support/PrivateContentPlusAttachmentsProfile.php',
     'WicketPortus\\Support\\WarningPrinter' => $baseDir . '/src/Support/WarningPrinter.php',
     'WicketPortus\\Support\\WordPressOptionReader' => $baseDir . '/src/Support/WordPressOptionReader.php',
 );

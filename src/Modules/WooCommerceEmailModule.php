@@ -137,11 +137,11 @@ class WooCommerceEmailModule implements ConfigModuleInterface
 
         // ── Per-email settings ──────────────────────────────────────
         $email_settings = [];
-        $email_ids      = $this->discover_email_ids();
+        $email_ids = $this->discover_email_ids();
 
         foreach ($email_ids as $email_id) {
             $option_name = $this->email_option_name($email_id);
-            $raw_value   = $this->reader->get($option_name, null);
+            $raw_value = $this->reader->get($option_name, null);
 
             $email_settings[$email_id] = [
                 'value'   => $raw_value,
@@ -183,7 +183,7 @@ class WooCommerceEmailModule implements ConfigModuleInterface
     public function import(array $payload, array $options = []): ImportResult
     {
         $dry_run = (bool) ($options['dry_run'] ?? true);
-        $result  = $dry_run ? ImportResult::dry_run() : ImportResult::commit();
+        $result = $dry_run ? ImportResult::dry_run() : ImportResult::commit();
 
         foreach ($this->validate($payload) as $error) {
             $result->add_error($error);
@@ -239,7 +239,7 @@ class WooCommerceEmailModule implements ConfigModuleInterface
         $email_values = [];
 
         foreach ($payload['email_settings'] as $email_id => $node) {
-            $email_id    = (string) $email_id;
+            $email_id = (string) $email_id;
             $option_name = $this->email_option_name($email_id);
 
             if (!$this->is_valid_email_id($email_id)) {
@@ -390,7 +390,7 @@ class WooCommerceEmailModule implements ConfigModuleInterface
     private function verify_schema_type_match(string $field_name, array $manifest_schema, array $static_schema): ?string
     {
         $manifest_type = $manifest_schema['type'] ?? null;
-        $static_type   = $static_schema['type'] ?? null;
+        $static_type = $static_schema['type'] ?? null;
 
         if ($manifest_type !== $static_type) {
             return sprintf(
@@ -415,7 +415,7 @@ class WooCommerceEmailModule implements ConfigModuleInterface
     {
         if (function_exists('WC') && class_exists('WC_Emails')) {
             $wc_emails = \WC_Emails::instance();
-            $emails    = $wc_emails->get_emails();
+            $emails = $wc_emails->get_emails();
 
             if (is_array($emails) && !empty($emails)) {
                 $ids = [];

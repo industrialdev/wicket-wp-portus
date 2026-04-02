@@ -102,4 +102,3 @@ class DeveloperWpOptionsSnapshotModule implements ConfigModuleInterface
         return $result;
     }
 }
-
