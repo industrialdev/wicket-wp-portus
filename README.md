@@ -2,8 +2,6 @@
 
 Wicket Portus makes Wicket site configuration portable, reviewable, and repeatable.
 
-This README reflects the current implementation in `src/`.
-
 ## Current Status
 
 - Plugin version: `0.1.0`
@@ -35,7 +33,6 @@ This README reflects the current implementation in `src/`.
 ## What Portus Does Not Do Today
 
 - No WP-CLI command surface in this plugin.
-- No built-in module result code taxonomy (`ok/warn/skip/error`) outside module result arrays.
 
 ## Core Manifest Contract
 
