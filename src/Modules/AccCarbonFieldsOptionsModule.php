@@ -8,6 +8,7 @@ use HyperFields\ContentTransferAdapter;
 use WicketPortus\Contracts\ConfigModuleInterface;
 use WicketPortus\Manifest\ImportResult;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
+use WicketPortus\Support\PrivateContentPlusAttachmentsProfile;
 use WicketPortus\Support\WordPressOptionReader;
 
 /**
@@ -204,6 +205,7 @@ class AccCarbonFieldsOptionsModule implements ConfigModuleInterface
                 'include_meta' => true,
                 'meta_mode' => 'merge',
                 'include_private_meta' => true,
+                'normalization_profile' => PrivateContentPlusAttachmentsProfile::profile_key(),
             ]
         );
 

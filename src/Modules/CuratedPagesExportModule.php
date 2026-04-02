@@ -7,6 +7,7 @@ namespace WicketPortus\Modules;
 use HyperFields\ContentTransferAdapter;
 use WicketPortus\Contracts\ConfigModuleInterface;
 use WicketPortus\Manifest\ImportResult;
+use WicketPortus\Support\PrivateContentPlusAttachmentsProfile;
 
 /**
  * Export module for a curated list of specific pages by slug.
@@ -137,6 +138,7 @@ class CuratedPagesExportModule implements ConfigModuleInterface
                 'include_meta' => true,
                 'meta_mode' => 'merge',
                 'include_private_meta' => true,
+                'normalization_profile' => PrivateContentPlusAttachmentsProfile::profile_key(),
             ]
         );
         foreach (($import['errors'] ?? []) as $error) {
