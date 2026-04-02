@@ -168,7 +168,7 @@ class FinancialFieldsModule implements ConfigModuleInterface
         $allowed = array_keys($option_values);
 
         if ($dry_run) {
-            $diff = $this->transfer->diff_option_values($option_values, $allowed, '', 'replace');
+            $diff = $this->transfer->diff_option_values($option_values, $allowed, '', 'merge');
 
             if (!($diff['success'] ?? false)) {
                 $result->add_error((string) ($diff['message'] ?? 'financial_fields: dry-run diff failed.'));
@@ -191,7 +191,7 @@ class FinancialFieldsModule implements ConfigModuleInterface
             return $result;
         }
 
-        $import = $this->transfer->import_option_values($option_values, $allowed, '', 'replace');
+        $import = $this->transfer->import_option_values($option_values, $allowed, '', 'merge');
 
         if ($import['success'] ?? false) {
             foreach ($allowed as $key) {

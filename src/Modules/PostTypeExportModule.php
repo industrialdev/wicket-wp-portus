@@ -84,7 +84,7 @@ class PostTypeExportModule implements ConfigModuleInterface
                 'create_missing' => true,
                 'update_existing' => true,
                 'include_meta' => true,
-                'meta_mode' => 'replace',
+                'meta_mode' => 'merge',
                 'include_private_meta' => true,
             ]
         );

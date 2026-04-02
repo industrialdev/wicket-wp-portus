@@ -93,8 +93,9 @@ final class ContentTransferAdapter
             'create_missing' => !isset($options['create_missing']) || (bool) $options['create_missing'],
             'update_existing' => !isset($options['update_existing']) || (bool) $options['update_existing'],
             'include_meta' => !isset($options['include_meta']) || (bool) $options['include_meta'],
-            'meta_mode' => ((string) ($options['meta_mode'] ?? 'replace')) === 'merge' ? 'merge' : 'replace',
+            'meta_mode' => ((string) ($options['meta_mode'] ?? 'merge')) === 'replace' ? 'replace' : 'merge',
             'include_private_meta' => !isset($options['include_private_meta']) || (bool) $options['include_private_meta'],
+            'normalization_profile' => sanitize_key((string) ($options['normalization_profile'] ?? '')),
         ]);
     }
 
@@ -204,4 +205,3 @@ final class ContentTransferAdapter
         return $normalized;
     }
 }
-

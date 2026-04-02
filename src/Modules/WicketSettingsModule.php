@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WicketPortus\Modules;
 
+use HyperFields\Validation\SchemaValidator;
 use WicketPortus\Contracts\ConfigModuleInterface;
 use WicketPortus\Contracts\SanitizableModuleInterface;
 use WicketPortus\Manifest\ImportResult;
@@ -23,6 +24,9 @@ use WicketPortus\Support\WordPressOptionReader;
 class WicketSettingsModule implements ConfigModuleInterface, SanitizableModuleInterface
 {
     private const OPTION_KEY = 'wicket_settings';
+    private const OPTION_SCHEMA = [
+        self::OPTION_KEY => ['type' => 'array'],
+    ];
 
     /**
      * @param WordPressOptionReader     $reader   WordPress options reader.
@@ -95,13 +99,19 @@ class WicketSettingsModule implements ConfigModuleInterface, SanitizableModuleIn
         }
 
         $option_values = [self::OPTION_KEY => $payload];
+        foreach (SchemaValidator::validateMap($option_values, self::OPTION_SCHEMA, 'wicket_settings') as $validationError) {
+            $result->add_error((string) $validationError);
+        }
+        if (!$result->is_successful()) {
+            return $result;
+        }
 
         if ($dry_run) {
             $diff = $this->transfer->diff_option_values(
                 $option_values,
                 [self::OPTION_KEY],
                 '',
-                'replace'
+                'merge'
             );
 
             if (!($diff['success'] ?? false)) {
@@ -131,7 +141,7 @@ class WicketSettingsModule implements ConfigModuleInterface, SanitizableModuleIn
             $option_values,
             [self::OPTION_KEY],
             '',
-            'replace'
+            'merge'
         );
 
         if ($import['success'] ?? false) {

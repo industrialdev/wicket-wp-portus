@@ -141,6 +141,7 @@ class ContentExportImport
      *                        - include_private_meta: bool (default false)
      *                        - include_meta_keys: string[] allowlist
      *                        - exclude_meta_keys: string[] denylist
+     *                        - normalization_profile: string (optional row normalization profile key)
      * @return array{
      *   success: bool,
      *   message: string,
@@ -200,6 +201,13 @@ class ContentExportImport
             if (!is_array($row)) {
                 $stats['skipped']++;
                 $errors[] = 'Skipped content row: invalid payload item type.';
+                continue;
+            }
+
+            $row = self::normalizeImportRow($row, $options);
+            if (!is_array($row)) {
+                $stats['skipped']++;
+                $errors[] = 'Skipped content row: normalizer returned invalid payload item type.';
                 continue;
             }
 
@@ -442,6 +450,44 @@ class ContentExportImport
         self::dispatchContentImportAfter($result, $decoded, $options);
 
         return $result;
+    }
+
+    /**
+     * Allows extensions to normalize one incoming row before import decisions.
+     *
+     * Supports two filter layers:
+     * - `hyperfields/content_import/normalize_row` for global rules.
+     * - `hyperfields/content_import/normalize_row/profile_{profile}` for a
+     *   named profile declared by import option `normalization_profile`.
+     *
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    private static function normalizeImportRow(array $row, array $options): array
+    {
+        $postType = sanitize_key((string) ($row['post_type'] ?? ''));
+        $slug = sanitize_title((string) ($row['slug'] ?? ($row['post_name'] ?? '')));
+
+        /** @var mixed $normalized */
+        $normalized = apply_filters('hyperfields/content_import/normalize_row', $row, $postType, $slug, $options);
+        if (!is_array($normalized)) {
+            return $row;
+        }
+
+        $profile = sanitize_key((string) ($options['normalization_profile'] ?? ''));
+        if ($profile === '') {
+            return $normalized;
+        }
+
+        $hook = 'hyperfields/content_import/normalize_row/profile_' . $profile;
+        /** @var mixed $profileNormalized */
+        $profileNormalized = apply_filters($hook, $normalized, $postType, $slug, $options);
+        if (!is_array($profileNormalized)) {
+            return $normalized;
+        }
+
+        return $profileNormalized;
     }
 
     /**

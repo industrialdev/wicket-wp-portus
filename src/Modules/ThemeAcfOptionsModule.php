@@ -113,7 +113,7 @@ class ThemeAcfOptionsModule implements ConfigModuleInterface, OptionGroupProvide
         );
 
         if ($dry_run) {
-            $diff = $this->transfer->diff_option_values($option_values, $allowed, '', 'replace');
+            $diff = $this->transfer->diff_option_values($option_values, $allowed, '', 'merge');
             if (!($diff['success'] ?? false)) {
                 $result->add_error((string) ($diff['message'] ?? 'theme_acf_options: dry-run diff failed.'));
 
@@ -130,7 +130,7 @@ class ThemeAcfOptionsModule implements ConfigModuleInterface, OptionGroupProvide
             return $result;
         }
 
-        $import = $this->transfer->import_option_values($option_values, $allowed, '', 'replace');
+        $import = $this->transfer->import_option_values($option_values, $allowed, '', 'merge');
 
         if ($import['success'] ?? false) {
             foreach ($allowed as $option_name) {

@@ -101,7 +101,7 @@ class MembershipOptionsModule implements ConfigModuleInterface, OptionGroupProvi
                 $option_values,
                 [self::OPTION_KEY],
                 '',
-                'replace'
+                'merge'
             );
 
             if (!($diff['success'] ?? false)) {
@@ -124,7 +124,7 @@ class MembershipOptionsModule implements ConfigModuleInterface, OptionGroupProvi
             $option_values,
             [self::OPTION_KEY],
             '',
-            'replace'
+            'merge'
         );
 
         if ($import['success'] ?? false) {

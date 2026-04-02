@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WicketPortus\Modules;
 
 use HyperFields\ContentTransferAdapter;
+use HyperFields\Validation\SchemaValidator;
 use WicketPortus\Contracts\ConfigModuleInterface;
 use WicketPortus\Manifest\ImportResult;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
@@ -20,6 +21,9 @@ class WicketMembershipsModule implements ConfigModuleInterface
 {
     private const OPTION_KEY = 'wicket_membership_plugin_options';
     private const POST_TYPE = 'wicket_mship_config';
+    private const OPTION_SCHEMA = [
+        self::OPTION_KEY => ['type' => 'array'],
+    ];
 
     /**
      * @param WordPressOptionReader     $reader   WordPress options reader.
@@ -93,13 +97,19 @@ class WicketMembershipsModule implements ConfigModuleInterface
         $option_values = [
             self::OPTION_KEY => $payload['plugin_options'],
         ];
+        foreach (SchemaValidator::validateMap($option_values, self::OPTION_SCHEMA, 'memberships') as $validationError) {
+            $result->add_error((string) $validationError);
+        }
+        if (!$result->is_successful()) {
+            return $result;
+        }
 
         if ($dry_run) {
             $diff = $this->transfer->diff_option_values(
                 $option_values,
                 [self::OPTION_KEY],
                 '',
-                'replace'
+                'merge'
             );
 
             if (!($diff['success'] ?? false)) {
@@ -118,7 +128,7 @@ class WicketMembershipsModule implements ConfigModuleInterface
                 $option_values,
                 [self::OPTION_KEY],
                 '',
-                'replace'
+                'merge'
             );
 
             if ($import['success'] ?? false) {
@@ -129,9 +139,7 @@ class WicketMembershipsModule implements ConfigModuleInterface
         }
 
         $content_import = ContentTransferAdapter::importRows(
-            rows: $this->normalize_membership_config_rows(
-                is_array($payload['config_posts'] ?? null) ? $payload['config_posts'] : []
-            ),
+            rows: is_array($payload['config_posts'] ?? null) ? $payload['config_posts'] : [],
             options: [
                 'default_post_type' => self::POST_TYPE,
                 'allowed_post_types' => [self::POST_TYPE],
@@ -143,6 +151,7 @@ class WicketMembershipsModule implements ConfigModuleInterface
                 // manifest while still updating known membership config keys.
                 'meta_mode' => 'merge',
                 'include_private_meta' => true,
+                'normalization_profile' => 'wicket_memberships_config_v1',
             ]
         );
 
@@ -162,134 +171,5 @@ class WicketMembershipsModule implements ConfigModuleInterface
         }
 
         return $result;
-    }
-
-    /**
-     * Normalizes membership config row meta payloads to canonical object shapes.
-     *
-     * Handles legacy tuple-like data for keys used by memberships UI:
-     * - cycle_data: [cycle_type, anniversary_data, calendar_items]
-     * - late_fee_window_data: [days_count, product_id, locales]
-     * - renewal_window_data: [days_count, locales]
-     *
-     * @param array<int, mixed> $rows
-     * @return array<int, mixed>
-     */
-    private function normalize_membership_config_rows(array $rows): array
-    {
-        $normalized = [];
-        foreach ($rows as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
-            $meta = is_array($row['meta'] ?? null) ? $row['meta'] : [];
-            $row['meta'] = $this->normalize_membership_config_meta($meta);
-            $normalized[] = $row;
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @param array<string, mixed> $meta
-     * @return array<string, mixed>
-     */
-    private function normalize_membership_config_meta(array $meta): array
-    {
-        if (array_key_exists('cycle_data', $meta)) {
-            $meta['cycle_data'] = $this->normalize_cycle_data($meta['cycle_data']);
-        }
-
-        if (array_key_exists('late_fee_window_data', $meta)) {
-            $meta['late_fee_window_data'] = $this->normalize_late_fee_window_data($meta['late_fee_window_data']);
-        }
-
-        if (array_key_exists('renewal_window_data', $meta)) {
-            $meta['renewal_window_data'] = $this->normalize_renewal_window_data($meta['renewal_window_data']);
-        }
-
-        return $meta;
-    }
-
-    /**
-     * @param mixed $value
-     * @return mixed
-     */
-    private function normalize_cycle_data(mixed $value): mixed
-    {
-        if (!is_array($value)) {
-            return $value;
-        }
-
-        if (array_key_exists('cycle_type', $value)) {
-            return $value;
-        }
-
-        if (!isset($value[0]) && !isset($value[1]) && !isset($value[2])) {
-            return $value;
-        }
-
-        $anniversary = isset($value[1]) && is_array($value[1]) ? $value[1] : [];
-        $calendarItems = isset($value[2]) && is_array($value[2]) ? $value[2] : [];
-
-        return [
-            'cycle_type' => isset($value[0]) ? (string) $value[0] : 'calendar',
-            'anniversary_data' => $anniversary,
-            'calendar_items' => $calendarItems,
-        ];
-    }
-
-    /**
-     * @param mixed $value
-     * @return mixed
-     */
-    private function normalize_late_fee_window_data(mixed $value): mixed
-    {
-        if (!is_array($value)) {
-            return $value;
-        }
-
-        if (array_key_exists('days_count', $value)) {
-            return $value;
-        }
-
-        if (!isset($value[0]) && !isset($value[1]) && !isset($value[2])) {
-            return $value;
-        }
-
-        $locales = isset($value[2]) && is_array($value[2]) ? $value[2] : [];
-
-        return [
-            'days_count' => isset($value[0]) ? (int) $value[0] : 0,
-            'product_id' => isset($value[1]) ? (int) $value[1] : -1,
-            'locales' => $locales,
-        ];
-    }
-
-    /**
-     * @param mixed $value
-     * @return mixed
-     */
-    private function normalize_renewal_window_data(mixed $value): mixed
-    {
-        if (!is_array($value)) {
-            return $value;
-        }
-
-        if (array_key_exists('days_count', $value)) {
-            return $value;
-        }
-
-        if (!isset($value[0]) && !isset($value[1])) {
-            return $value;
-        }
-
-        $locales = isset($value[1]) && is_array($value[1]) ? $value[1] : [];
-
-        return [
-            'days_count' => isset($value[0]) ? (int) $value[0] : 0,
-            'locales' => $locales,
-        ];
     }
 }

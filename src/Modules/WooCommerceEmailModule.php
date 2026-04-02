@@ -321,7 +321,7 @@ class WooCommerceEmailModule implements ConfigModuleInterface
         $allowed = array_keys($all_values);
 
         if ($dry_run) {
-            $diff = $this->transfer->diff_option_values($all_values, $allowed, '', 'replace');
+            $diff = $this->transfer->diff_option_values($all_values, $allowed, '', 'merge');
 
             if (!($diff['success'] ?? false)) {
                 $result->add_error((string) ($diff['message'] ?? 'woocommerce_emails: dry-run diff failed.'));
@@ -345,7 +345,7 @@ class WooCommerceEmailModule implements ConfigModuleInterface
             return $result;
         }
 
-        $import = $this->transfer->import_option_values($all_values, $allowed, '', 'replace');
+        $import = $this->transfer->import_option_values($all_values, $allowed, '', 'merge');
 
         if ($import['success'] ?? false) {
             foreach ($allowed as $key) {

@@ -21,6 +21,7 @@ use WicketPortus\Modules\WicketSettingsModule;
 use WicketPortus\Modules\WooCommerceEmailModule;
 use WicketPortus\Registry\ModuleRegistry;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
+use WicketPortus\Support\MembershipConfigContentProfile;
 use WicketPortus\Support\WarningPrinter;
 use WicketPortus\Support\WordPressOptionReader;
 
@@ -85,6 +86,7 @@ class Plugin
         add_action('admin_init', [$this, 'maybe_apply_deferred_plugin_changes']);
         add_filter('hyperfields/import/ui_notice_message', [$this, 'filter_portus_import_notice_message'], 10, 3);
         add_filter('hyperfields/import/ui_notice_extra_html', [$this, 'filter_portus_import_notice_extra_html'], 10, 3);
+        MembershipConfigContentProfile::register();
 
         /*
          * Allows extensions to register additional modules.
