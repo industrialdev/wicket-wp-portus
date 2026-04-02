@@ -597,6 +597,13 @@ class ContentExportImport
             }
         }
 
+        if ($resolved === null) {
+            $trashedByDesiredSlug = self::resolveTrashedPostByDesiredSlug($postType, $slug);
+            if ($trashedByDesiredSlug !== null) {
+                $resolved = $trashedByDesiredSlug;
+            }
+        }
+
         /**
          * Filters resolved existing post candidate for an import row.
          *
@@ -616,6 +623,45 @@ class ContentExportImport
         }
 
         return null;
+    }
+
+    /**
+     * Finds a trashed post by desired slug metadata for slug ownership recovery.
+     *
+     * WordPress may rename trashed post slugs and keep the original desired slug
+     * in `_wp_desired_post_slug`. Matching this allows imports to update/restore
+     * the intended trashed record instead of creating a new suffixed slug.
+     *
+     * @return object|null
+     */
+    private static function resolveTrashedPostByDesiredSlug(string $postType, string $slug): ?object
+    {
+        $matches = get_posts([
+            'post_type' => $postType,
+            'post_status' => 'trash',
+            'posts_per_page' => 1,
+            'orderby' => 'ID',
+            'order' => 'DESC',
+            'suppress_filters' => false,
+            'meta_query' => [
+                [
+                    'key' => '_wp_desired_post_slug',
+                    'value' => $slug,
+                    'compare' => '=',
+                ],
+            ],
+        ]);
+
+        if (!is_array($matches) || empty($matches)) {
+            return null;
+        }
+
+        $candidate = $matches[0] ?? null;
+        if (!is_object($candidate) || !isset($candidate->ID)) {
+            return null;
+        }
+
+        return $candidate;
     }
 
     /**
@@ -905,7 +951,7 @@ class ContentExportImport
     }
 
     /**
-     * @param array<string, array<int, mixed>> $metaPayload
+     * @param array<string, mixed> $metaPayload
      */
     private static function applyPostMeta(int $postId, array $metaPayload, array $settings, bool $dryRun, string $metaMode): int
     {
@@ -920,7 +966,7 @@ class ContentExportImport
         $incoming = [];
         foreach ($metaPayload as $key => $values) {
             $metaKey = (string) $key;
-            if ($metaKey === '' || !is_array($values)) {
+            if ($metaKey === '') {
                 continue;
             }
 
@@ -936,7 +982,7 @@ class ContentExportImport
                 continue;
             }
 
-            $incoming[$metaKey] = $values;
+            $incoming[$metaKey] = self::normalizeIncomingMetaValues($values);
         }
 
         if (empty($incoming)) {
@@ -979,6 +1025,26 @@ class ContentExportImport
         }
 
         return $updated;
+    }
+
+    /**
+     * Normalizes one incoming meta value into add_post_meta-compatible values list.
+     *
+     * Accepts both payload shapes:
+     * - scalar/object as one logical meta value (wrapped as single-item list)
+     * - list arrays as multi-value meta payload
+     */
+    private static function normalizeIncomingMetaValues(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [$value];
+        }
+
+        if (array_is_list($value)) {
+            return $value;
+        }
+
+        return [$value];
     }
 
     /**

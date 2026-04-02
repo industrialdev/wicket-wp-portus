@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WicketPortus\Modules;
 
+use HyperFields\ContentTransferAdapter;
 use WicketPortus\Contracts\ConfigModuleInterface;
 use WicketPortus\Manifest\ImportResult;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
@@ -46,39 +47,9 @@ class WicketMembershipsModule implements ConfigModuleInterface
         $plugin_options = $this->reader->get(self::OPTION_KEY, []);
         $plugin_options = is_array($plugin_options) ? $plugin_options : [];
 
-        // Export membership config CPT posts
-        $posts = get_posts([
-            'post_type' => self::POST_TYPE,
-            'post_status' => 'any',
-            'numberposts' => -1,
-            'orderby' => 'ID',
-            'order' => 'ASC',
-            'suppress_filters' => false,
-        ]);
-
-        $post_rows = [];
-        foreach ($posts as $post) {
-            if (!($post instanceof \WP_Post)) {
-                continue;
-            }
-
-            $post_rows[] = [
-                '__strategy' => 'replace',
-                'post_type' => (string) $post->post_type,
-                'post_name' => (string) $post->post_name,
-                'post_title' => (string) $post->post_title,
-                'post_status' => (string) $post->post_status,
-                'post_parent' => (int) $post->post_parent,
-                'menu_order' => (int) $post->menu_order,
-                'post_content' => (string) $post->post_content,
-                'post_excerpt' => (string) $post->post_excerpt,
-                'meta' => $this->export_post_meta((int) $post->ID),
-            ];
-        }
-
         return [
             'plugin_options' => $plugin_options,
-            'config_posts' => $post_rows,
+            'config_posts' => ContentTransferAdapter::exportRows(self::POST_TYPE),
         ];
     }
 
@@ -157,46 +128,168 @@ class WicketMembershipsModule implements ConfigModuleInterface
             }
         }
 
-        // Config posts are export-only
-        foreach (($payload['config_posts'] ?? []) as $post_row) {
-            $slug = is_array($post_row) ? (string) ($post_row['post_name'] ?? '') : '';
-            $key = $slug !== '' ? $slug : 'unknown';
-            $result->add_skipped("config_post:{$key}", 'export-only (review in manifest)');
+        $content_import = ContentTransferAdapter::importRows(
+            rows: $this->normalize_membership_config_rows(
+                is_array($payload['config_posts'] ?? null) ? $payload['config_posts'] : []
+            ),
+            options: [
+                'default_post_type' => self::POST_TYPE,
+                'allowed_post_types' => [self::POST_TYPE],
+                'dry_run' => $dry_run,
+                'create_missing' => true,
+                'update_existing' => true,
+                'include_meta' => true,
+                // Keep unknown plugin/private keys that are not part of the
+                // manifest while still updating known membership config keys.
+                'meta_mode' => 'merge',
+                'include_private_meta' => true,
+            ]
+        );
+
+        foreach (($content_import['errors'] ?? []) as $error) {
+            $result->add_error((string) $error);
+        }
+
+        $summary = ContentTransferAdapter::summarizeImportActions(
+            $content_import,
+            static fn (array $actionRow, string $slug): string => $slug !== '' ? "config_post:{$slug}" : 'config_post:unknown'
+        );
+        foreach ($summary['imported'] as $key) {
+            $result->add_imported((string) $key);
+        }
+        foreach ($summary['skipped'] as $skip) {
+            $result->add_skipped((string) ($skip['key'] ?? 'config_post:unknown'), (string) ($skip['reason'] ?? 'skipped'));
         }
 
         return $result;
     }
 
     /**
-     * Exports all public + protected post meta values for a post.
+     * Normalizes membership config row meta payloads to canonical object shapes.
      *
-     * @param int $post_id
-     * @return array<string, mixed>
+     * Handles legacy tuple-like data for keys used by memberships UI:
+     * - cycle_data: [cycle_type, anniversary_data, calendar_items]
+     * - late_fee_window_data: [days_count, product_id, locales]
+     * - renewal_window_data: [days_count, locales]
+     *
+     * @param array<int, mixed> $rows
+     * @return array<int, mixed>
      */
-    private function export_post_meta(int $post_id): array
+    private function normalize_membership_config_rows(array $rows): array
     {
-        $meta = get_post_meta($post_id);
-        if (!is_array($meta)) {
-            return [];
-        }
-
         $normalized = [];
-        foreach ($meta as $key => $values) {
-            if (!is_string($key) || !is_array($values)) {
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
                 continue;
             }
 
-            $mapped = array_map(
-                static fn ($value): mixed => maybe_unserialize($value),
-                $values
-            );
-
-            // Single-valued keys are unwrapped for readability.
-            $normalized[$key] = count($mapped) === 1 ? $mapped[0] : $mapped;
+            $meta = is_array($row['meta'] ?? null) ? $row['meta'] : [];
+            $row['meta'] = $this->normalize_membership_config_meta($meta);
+            $normalized[] = $row;
         }
 
-        ksort($normalized);
-
         return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     * @return array<string, mixed>
+     */
+    private function normalize_membership_config_meta(array $meta): array
+    {
+        if (array_key_exists('cycle_data', $meta)) {
+            $meta['cycle_data'] = $this->normalize_cycle_data($meta['cycle_data']);
+        }
+
+        if (array_key_exists('late_fee_window_data', $meta)) {
+            $meta['late_fee_window_data'] = $this->normalize_late_fee_window_data($meta['late_fee_window_data']);
+        }
+
+        if (array_key_exists('renewal_window_data', $meta)) {
+            $meta['renewal_window_data'] = $this->normalize_renewal_window_data($meta['renewal_window_data']);
+        }
+
+        return $meta;
+    }
+
+    /**
+     * @param mixed $value
+     * @return mixed
+     */
+    private function normalize_cycle_data(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        if (array_key_exists('cycle_type', $value)) {
+            return $value;
+        }
+
+        if (!isset($value[0]) && !isset($value[1]) && !isset($value[2])) {
+            return $value;
+        }
+
+        $anniversary = isset($value[1]) && is_array($value[1]) ? $value[1] : [];
+        $calendarItems = isset($value[2]) && is_array($value[2]) ? $value[2] : [];
+
+        return [
+            'cycle_type' => isset($value[0]) ? (string) $value[0] : 'calendar',
+            'anniversary_data' => $anniversary,
+            'calendar_items' => $calendarItems,
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     * @return mixed
+     */
+    private function normalize_late_fee_window_data(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        if (array_key_exists('days_count', $value)) {
+            return $value;
+        }
+
+        if (!isset($value[0]) && !isset($value[1]) && !isset($value[2])) {
+            return $value;
+        }
+
+        $locales = isset($value[2]) && is_array($value[2]) ? $value[2] : [];
+
+        return [
+            'days_count' => isset($value[0]) ? (int) $value[0] : 0,
+            'product_id' => isset($value[1]) ? (int) $value[1] : -1,
+            'locales' => $locales,
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     * @return mixed
+     */
+    private function normalize_renewal_window_data(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        if (array_key_exists('days_count', $value)) {
+            return $value;
+        }
+
+        if (!isset($value[0]) && !isset($value[1])) {
+            return $value;
+        }
+
+        $locales = isset($value[1]) && is_array($value[1]) ? $value[1] : [];
+
+        return [
+            'days_count' => isset($value[0]) ? (int) $value[0] : 0,
+            'locales' => $locales,
+        ];
     }
 }
