@@ -18,6 +18,8 @@ use WicketPortus\Registry\ModuleRegistry;
  */
 class TransferOrchestrator
 {
+    private const LOG_SOURCE = 'wicket-portus';
+
     /**
      * @param ModuleRegistry $registry Registered Portus modules.
      */
@@ -46,7 +48,16 @@ class TransferOrchestrator
      */
     public function export(array $module_keys = [], string $mode = 'full'): array
     {
+        $started = microtime(true);
         $keys    = $this->resolve_module_keys($module_keys);
+        $this->log('info', 'Portus export started.', [
+            'operation' => 'export',
+            'export_mode' => $mode,
+            'requested_module_keys' => array_values(array_map('strval', $module_keys)),
+            'resolved_module_keys' => $keys,
+            'module_count' => count($keys),
+        ]);
+
         $manager = $this->build_manager($keys);
         $bundle  = $manager->export($keys, ['export_mode' => $mode]);
 
@@ -75,7 +86,18 @@ class TransferOrchestrator
 
         // Return the full Manager envelope (which carries site, type, schema_version
         // from SchemaConfig) with the unwrapped module payloads substituted in.
-        return array_merge($bundle, ['modules' => $modules]);
+        $result = array_merge($bundle, ['modules' => $modules]);
+        $errors = is_array($bundle['errors'] ?? null) ? $bundle['errors'] : [];
+
+        $this->log(empty($errors) ? 'info' : 'warning', 'Portus export completed.', [
+            'operation' => 'export',
+            'export_mode' => $mode,
+            'module_count' => count($keys),
+            'error_count' => count($errors),
+            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+        ]);
+
+        return $result;
     }
 
     /**
@@ -126,11 +148,30 @@ class TransferOrchestrator
      */
     public function diff(array $manifest, array $module_keys = []): array
     {
+        $started = microtime(true);
         $keys = $this->resolve_module_keys($module_keys);
+        $this->log('info', 'Portus diff started.', [
+            'operation' => 'diff',
+            'requested_module_keys' => array_values(array_map('strval', $module_keys)),
+            'resolved_module_keys' => $keys,
+            'module_count' => count($keys),
+        ]);
+
         $manager = $this->build_manager($keys);
         $bundle = $this->bundle_from_manifest($manifest, $keys);
+        $result = $manager->diff($bundle, ['dry_run' => true]);
+        $errors = is_array($result['errors'] ?? null) ? $result['errors'] : [];
+        $modules = is_array($result['modules'] ?? null) ? $result['modules'] : [];
 
-        return $manager->diff($bundle, ['dry_run' => true]);
+        $this->log(empty($errors) ? 'info' : 'warning', 'Portus diff completed.', [
+            'operation' => 'diff',
+            'module_count' => count($keys),
+            'result_module_count' => count($modules),
+            'error_count' => count($errors),
+            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+        ]);
+
+        return $result;
     }
 
     /**
@@ -143,11 +184,32 @@ class TransferOrchestrator
      */
     public function import(array $manifest, bool $dry_run = true, array $module_keys = []): array
     {
+        $started = microtime(true);
         $keys = $this->resolve_module_keys($module_keys);
+        $this->log('info', 'Portus import started.', [
+            'operation' => 'import',
+            'dry_run' => $dry_run,
+            'requested_module_keys' => array_values(array_map('strval', $module_keys)),
+            'resolved_module_keys' => $keys,
+            'module_count' => count($keys),
+        ]);
+
         $manager = $this->build_manager($keys);
         $bundle = $this->bundle_from_manifest($manifest, $keys);
+        $result = $manager->import($bundle, ['dry_run' => $dry_run]);
+        $errors = is_array($result['errors'] ?? null) ? $result['errors'] : [];
+        $modules = is_array($result['modules'] ?? null) ? $result['modules'] : [];
 
-        return $manager->import($bundle, ['dry_run' => $dry_run]);
+        $this->log(empty($errors) ? 'info' : 'warning', 'Portus import completed.', [
+            'operation' => 'import',
+            'dry_run' => $dry_run,
+            'module_count' => count($keys),
+            'result_module_count' => count($modules),
+            'error_count' => count($errors),
+            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+        ]);
+
+        return $result;
     }
 
     /**
@@ -193,19 +255,105 @@ class TransferOrchestrator
 
             $manager->registerModule(
                 $module_key,
-                exporter: static fn (array $context = []): array => ['payload' => $module->export()],
-                importer: static fn (array $payload, array $context): array => $module
-                    ->import(
-                        is_array($payload['payload'] ?? null) ? $payload['payload'] : [],
-                        ['dry_run' => (bool) ($context['dry_run'] ?? false)]
-                    )
-                    ->to_array(),
-                differ: static fn (array $payload, array $context = []): array => $module
-                    ->import(
-                        is_array($payload['payload'] ?? null) ? $payload['payload'] : [],
-                        ['dry_run' => true]
-                    )
-                    ->to_array()
+                exporter: function (array $context = []) use ($module_key, $module): array {
+                    $started = microtime(true);
+                    $this->log('debug', 'Portus module export started.', [
+                        'operation' => 'module_export',
+                        'module_key' => $module_key,
+                        'context_keys' => array_keys($context),
+                    ]);
+
+                    try {
+                        $payload = $module->export();
+                        $this->log('debug', 'Portus module export completed.', [
+                            'operation' => 'module_export',
+                            'module_key' => $module_key,
+                            'payload_keys' => is_array($payload) ? array_keys($payload) : [],
+                            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                        ]);
+
+                        return ['payload' => $payload];
+                    } catch (\Throwable $e) {
+                        $this->log('error', 'Portus module export failed.', [
+                            'operation' => 'module_export',
+                            'module_key' => $module_key,
+                            'exception' => $e->getMessage(),
+                            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                        ]);
+                        throw $e;
+                    }
+                },
+                importer: function (array $payload, array $context) use ($module_key, $module): array {
+                    $started = microtime(true);
+                    $dry_run = (bool) ($context['dry_run'] ?? false);
+                    $module_payload = is_array($payload['payload'] ?? null) ? $payload['payload'] : [];
+
+                    $this->log('debug', 'Portus module import started.', [
+                        'operation' => 'module_import',
+                        'module_key' => $module_key,
+                        'dry_run' => $dry_run,
+                        'payload_keys' => array_keys($module_payload),
+                    ]);
+
+                    try {
+                        $result = $module->import($module_payload, ['dry_run' => $dry_run])->to_array();
+                        $errors = is_array($result['errors'] ?? null) ? $result['errors'] : [];
+                        $imported = is_array($result['imported'] ?? null) ? $result['imported'] : [];
+                        $skipped = is_array($result['skipped'] ?? null) ? $result['skipped'] : [];
+
+                        $this->log(empty($errors) ? 'debug' : 'warning', 'Portus module import completed.', [
+                            'operation' => 'module_import',
+                            'module_key' => $module_key,
+                            'dry_run' => $dry_run,
+                            'imported_count' => count($imported),
+                            'skipped_count' => count($skipped),
+                            'error_count' => count($errors),
+                            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                        ]);
+
+                        return $result;
+                    } catch (\Throwable $e) {
+                        $this->log('error', 'Portus module import failed.', [
+                            'operation' => 'module_import',
+                            'module_key' => $module_key,
+                            'dry_run' => $dry_run,
+                            'exception' => $e->getMessage(),
+                            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                        ]);
+                        throw $e;
+                    }
+                },
+                differ: function (array $payload, array $context = []) use ($module_key, $module): array {
+                    $started = microtime(true);
+                    $module_payload = is_array($payload['payload'] ?? null) ? $payload['payload'] : [];
+                    $this->log('debug', 'Portus module diff started.', [
+                        'operation' => 'module_diff',
+                        'module_key' => $module_key,
+                        'context_keys' => array_keys($context),
+                        'payload_keys' => array_keys($module_payload),
+                    ]);
+
+                    try {
+                        $result = $module->import($module_payload, ['dry_run' => true])->to_array();
+                        $errors = is_array($result['errors'] ?? null) ? $result['errors'] : [];
+                        $this->log(empty($errors) ? 'debug' : 'warning', 'Portus module diff completed.', [
+                            'operation' => 'module_diff',
+                            'module_key' => $module_key,
+                            'error_count' => count($errors),
+                            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                        ]);
+
+                        return $result;
+                    } catch (\Throwable $e) {
+                        $this->log('error', 'Portus module diff failed.', [
+                            'operation' => 'module_diff',
+                            'module_key' => $module_key,
+                            'exception' => $e->getMessage(),
+                            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                        ]);
+                        throw $e;
+                    }
+                }
             );
         }
 
@@ -236,5 +384,41 @@ class TransferOrchestrator
             'modules' => $modules,
             'errors' => [],
         ];
+    }
+
+    /**
+     * Writes Portus logs via Wicket base-plugin logger.
+     *
+     * @param string $level
+     * @param string $message
+     * @param array<string, mixed> $context
+     * @return void
+     */
+    private function log(string $level, string $message, array $context = []): void
+    {
+        if (!function_exists('Wicket')) {
+            return;
+        }
+
+        try {
+            $logger = Wicket()->log();
+            if (!is_object($logger)) {
+                return;
+            }
+
+            $context['source'] = self::LOG_SOURCE;
+            $context['component'] = 'transfer-orchestrator';
+
+            if (method_exists($logger, $level)) {
+                $logger->{$level}($message, $context);
+                return;
+            }
+
+            if (method_exists($logger, 'log')) {
+                $logger->log($level, $message, $context);
+            }
+        } catch (\Throwable) {
+            // Never let logging failures affect transfer behavior.
+        }
     }
 }
