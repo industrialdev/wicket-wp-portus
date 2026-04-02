@@ -380,7 +380,7 @@ class Plugin
                 try {
                     do_action('wicket_portus/import/after', $import_result, $decoded);
                 } catch (\Throwable $e) {
-                    error_log('wicket_portus/import/after hook error: ' . $e->getMessage());
+                    Wicket()->log()->error('wicket_portus/import/after hook error: ' . $e->getMessage(), ['source' => 'wicket-portus']);
                 }
 
                 $import_result['meta']['queued_plugin_changes'] = $this->queued_plugin_change_count();
