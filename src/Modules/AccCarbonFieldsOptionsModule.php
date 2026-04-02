@@ -4,19 +4,48 @@ declare(strict_types=1);
 
 namespace WicketPortus\Modules;
 
+use HyperFields\ContentTransferAdapter;
 use WicketPortus\Contracts\ConfigModuleInterface;
 use WicketPortus\Manifest\ImportResult;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
 use WicketPortus\Support\WordPressOptionReader;
 
 /**
- * Export/import adapter for Account Centre Carbon Fields theme options.
+ * Unified export/import for Account Centre options + curated my-account pages.
  *
  * Does NOT implement OptionGroupProviderInterface — this module presents as a
  * single "Wicket Account Centre" row in the export UI.
  */
 class AccCarbonFieldsOptionsModule implements ConfigModuleInterface
 {
+    private const MY_ACCOUNT_POST_TYPE = 'my-account';
+
+    /**
+     * Curated list of account-centre my-account page slugs to export/import.
+     *
+     * @var string[]
+     */
+    private const MY_ACCOUNT_CURATED_SLUGS = [
+        'dashboard',
+        'manage-password',
+        'manage-preferences',
+        'payment-methods',
+        'my-downloads',
+        'my-cart',
+        'edit-profile',
+        'events',
+        'payments-settings',
+        'organization-management',
+        'acc_global-headerbanner',
+        'add-payment-method',
+        'orders',
+        'view-order',
+        'subscriptions',
+        'organization-members',
+        'organization-profile',
+        'change-password',
+    ];
+
     /**
      * LIKE patterns used to discover ACC Carbon Fields option rows.
      *
@@ -25,6 +54,13 @@ class AccCarbonFieldsOptionsModule implements ConfigModuleInterface
     private function option_name_patterns(): array
     {
         $patterns = [
+            // Current Carbon Fields storage shape for ACC theme options.
+            '_ac_localization',
+            '_acc_sidebar_location',
+            '_acc_profile_picture_size',
+            '_acc_profile_picture_default%',
+            '_acc_global-headerbanner',
+            // Legacy/alternate container-derived keys.
             'carbon_fields_container_wicket_acc_options%',
             '_carbon_fields_container_wicket_acc_options%',
         ];
@@ -61,6 +97,11 @@ class AccCarbonFieldsOptionsModule implements ConfigModuleInterface
         return [
             'option_names' => $names,
             'options' => $this->transfer->export_option_values($names),
+            'my_account_posts' => ContentTransferAdapter::exportRows(self::MY_ACCOUNT_POST_TYPE, [
+                'orderby' => 'name',
+                'order' => 'ASC',
+                'post_name__in' => self::MY_ACCOUNT_CURATED_SLUGS,
+            ]),
         ];
     }
 
@@ -73,6 +114,10 @@ class AccCarbonFieldsOptionsModule implements ConfigModuleInterface
 
         if (!isset($payload['options']) || !is_array($payload['options'])) {
             $errors[] = 'account_centre: payload must include an "options" array.';
+        }
+
+        if (isset($payload['my_account_posts']) && !is_array($payload['my_account_posts'])) {
+            $errors[] = 'account_centre: "my_account_posts" must be an array when provided.';
         }
 
         return $errors;
@@ -116,22 +161,107 @@ class AccCarbonFieldsOptionsModule implements ConfigModuleInterface
                 }
             }
 
-            return $result;
+        } else {
+            $import = $this->transfer->import_option_values($option_values, $allowed, '', 'merge');
+
+            if ($import['success'] ?? false) {
+                foreach ($allowed as $option_name) {
+                    if (array_key_exists($option_name, $option_values)) {
+                        $result->add_imported($option_name);
+                    }
+                }
+            } else {
+                $result->add_error((string) ($import['message'] ?? 'account_centre: import failed.'));
+            }
         }
 
-        $import = $this->transfer->import_option_values($option_values, $allowed, '', 'merge');
-
-        if ($import['success'] ?? false) {
-            foreach ($allowed as $option_name) {
-                if (array_key_exists($option_name, $option_values)) {
-                    $result->add_imported($option_name);
-                }
+        $curated_set = array_fill_keys(self::MY_ACCOUNT_CURATED_SLUGS, true);
+        $rows = [];
+        foreach ($this->resolve_my_account_rows($payload) as $post_row) {
+            if (!is_array($post_row)) {
+                continue;
             }
-        } else {
-            $result->add_error((string) ($import['message'] ?? 'account_centre: import failed.'));
+
+            $slug = (string) ($post_row['post_name'] ?? '');
+            $title = (string) ($post_row['post_title'] ?? '');
+            $label = $title !== '' ? "{$slug} ({$title})" : $slug;
+            if (!isset($curated_set[$slug])) {
+                $result->add_skipped($label !== '' ? $label : 'unknown', 'slug not in curated list');
+                continue;
+            }
+
+            $rows[] = $post_row;
+        }
+
+        $content_import = ContentTransferAdapter::importRows(
+            rows: $rows,
+            options: [
+                'default_post_type' => self::MY_ACCOUNT_POST_TYPE,
+                'allowed_post_types' => [self::MY_ACCOUNT_POST_TYPE],
+                'dry_run' => $dry_run,
+                'create_missing' => true,
+                'update_existing' => true,
+                'include_meta' => true,
+                'meta_mode' => 'merge',
+                'include_private_meta' => true,
+            ]
+        );
+
+        foreach (($content_import['errors'] ?? []) as $error) {
+            $result->add_error((string) $error);
+        }
+
+        $summary = ContentTransferAdapter::summarizeImportActions(
+            $content_import,
+            static fn (array $action_row, string $slug): string => $slug !== '' ? "my_account:{$slug}" : 'my_account:unknown'
+        );
+        foreach ($summary['imported'] as $key) {
+            $result->add_imported((string) $key);
+        }
+        foreach ($summary['skipped'] as $skip) {
+            $result->add_skipped((string) ($skip['key'] ?? 'my_account:unknown'), (string) ($skip['reason'] ?? 'skipped'));
         }
 
         return $result;
+    }
+
+    /**
+     * Resolves account centre my-account rows from new and legacy payload shapes.
+     *
+     * @param array $payload
+     * @return array
+     */
+    private function resolve_my_account_rows(array $payload): array
+    {
+        if (is_array($payload['my_account_posts'] ?? null)) {
+            return $payload['my_account_posts'];
+        }
+
+        if (is_array($payload['posts'] ?? null) && ($payload['post_type'] ?? '') === self::MY_ACCOUNT_POST_TYPE) {
+            return $payload['posts'];
+        }
+
+        return [];
+    }
+
+    /**
+     * Returns the curated my-account slug list.
+     *
+     * @return string[]
+     */
+    public function curated_slugs(): array
+    {
+        return self::MY_ACCOUNT_CURATED_SLUGS;
+    }
+
+    /**
+     * Returns the my-account post type used by this module.
+     *
+     * @return string
+     */
+    public function my_account_post_type(): string
+    {
+        return self::MY_ACCOUNT_POST_TYPE;
     }
 
     /**

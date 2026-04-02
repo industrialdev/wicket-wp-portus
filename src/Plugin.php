@@ -113,6 +113,7 @@ class Plugin
         $disabled = apply_filters('wicket_portus_disabled_modules', [
             'content_pages',
             'content_my_account',
+            'my_account_pages',
         ]);
 
         if (!is_array($disabled)) {
@@ -585,7 +586,7 @@ class Plugin
             'woocommerce_emails' => 'All email settings',
             'gravity_forms_wicket_plugin' => 'Slug mapping, pagination, member fields',
             'memberships' => 'Plugin options + config posts',
-            'account_centre' => 'Plugin options',
+            'account_centre' => 'Plugin options + my-account pages',
             'financial_fields' => 'Revenue deferral and finance mapping',
             default => '',
         };
