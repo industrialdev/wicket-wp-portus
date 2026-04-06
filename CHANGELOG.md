@@ -1,5 +1,8 @@
 # Wicket Portus Changelog
 
+# 0.1.2
+- Security: deny Portus access to impersonated sessions from the User Switching plugin, even when the switched-to account has a permitted email domain.
+
 # 0.1.1
 - Initial release.
 - Export and import of Wicket stack configuration as portable JSON manifests.

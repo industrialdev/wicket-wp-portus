@@ -379,6 +379,7 @@ If the Wicket base plugin is not active, logging is silently skipped.
 
 1. Log in as a user with a `wicket.io` email. Confirm Portus menu appears.
 2. Log in as a user with a non-allowed domain. Confirm menu is hidden and direct URL returns 403.
+3. Use User Switching to switch into a `wicket.io` account from a non-permitted admin. Confirm Portus menu is hidden and direct URL returns 403.
 3. Export in `template` mode. Verify `modules.wicket_settings` has sensitive keys removed.
 4. Export in `full` mode without confirming the checkbox. Verify it falls back to `template`.
 5. Export in `full` mode with confirmation. Verify sensitive keys are present.

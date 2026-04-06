@@ -15,16 +15,24 @@ namespace WicketPortus\Access;
  *   define('WICKET_PORTUS_ALLOWED_DOMAINS', 'example.com,partner.org');
  *
  * wicket.io is always implicitly allowed regardless of that constant.
+ *
+ * Impersonated sessions (via the User Switching plugin) are always denied,
+ * even when the switched-to user has an otherwise permitted email domain.
  */
 class DomainGatekeeper
 {
     private const DEFAULT_DOMAIN = 'wicket.io';
 
     /**
-     * Returns true when the current user's email domain is in the allowed list.
+     * Returns true when the current user's email domain is in the allowed list
+     * AND the session is not an impersonated User Switching session.
      */
     public static function current_user_is_allowed(): bool
     {
+        if (self::is_switched_session()) {
+            return false;
+        }
+
         $user = wp_get_current_user();
 
         if (!$user || !$user->exists()) {
@@ -41,6 +49,41 @@ class DomainGatekeeper
         $domain = strtolower(substr($email, $at + 1));
 
         return in_array($domain, self::allowed_domains(), true);
+    }
+
+    /**
+     * Returns true when the current request is running under a User Switching
+     * impersonation session (i.e. an admin switched into another account).
+     *
+     * Detection relies on the User Switching plugin's own public API:
+     *   user_switching::get_old_user() returns a WP_User when a switch is active.
+     *
+     * Falls back to checking the olduser cookie directly when the plugin class
+     * is unavailable, so protection holds even if the plugin is deactivated
+     * mid-session while the cookie still exists.
+     */
+    public static function is_switched_session(): bool
+    {
+        // Primary: use User Switching's public API if available.
+        if (class_exists('user_switching') && method_exists('user_switching', 'get_old_user')) {
+            return (bool) \user_switching::get_old_user();
+        }
+
+        // Fallback: check for the olduser cookie directly.
+        // USER_SWITCHING_OLDUSER_COOKIE is defined by the plugin as
+        // 'wordpress_user_sw_olduser_' . COOKIEHASH.
+        if (defined('USER_SWITCHING_OLDUSER_COOKIE')) {
+            return !empty($_COOKIE[USER_SWITCHING_OLDUSER_COOKIE]);
+        }
+
+        // Derive the expected cookie name independently when the constant is absent.
+        if (defined('COOKIEHASH')) {
+            $cookie_name = 'wordpress_user_sw_olduser_' . COOKIEHASH;
+
+            return !empty($_COOKIE[$cookie_name]);
+        }
+
+        return false;
     }
 
     /**
