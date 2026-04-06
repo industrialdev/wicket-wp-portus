@@ -58,6 +58,7 @@ return array(
     'HyperFields\\Transfer\\SchemaConfig' => $vendorDir . '/estebanforge/hyperfields/src/Transfer/SchemaConfig.php',
     'HyperFields\\UserField' => $vendorDir . '/estebanforge/hyperfields/src/UserField.php',
     'HyperFields\\Validation\\SchemaValidator' => $vendorDir . '/estebanforge/hyperfields/src/Validation/SchemaValidator.php',
+    'WicketPortus\\Access\\DomainGatekeeper' => $baseDir . '/src/Access/DomainGatekeeper.php',
     'WicketPortus\\Contracts\\ConfigModuleInterface' => $baseDir . '/src/Contracts/ConfigModuleInterface.php',
     'WicketPortus\\Contracts\\OptionGroupProviderInterface' => $baseDir . '/src/Contracts/OptionGroupProviderInterface.php',
     'WicketPortus\\Contracts\\SanitizableModuleInterface' => $baseDir . '/src/Contracts/SanitizableModuleInterface.php',

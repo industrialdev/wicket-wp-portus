@@ -87,6 +87,7 @@ class ComposerStaticInitb4f3828c0666841b6fe71a826549a7c2
         'HyperFields\\Transfer\\SchemaConfig' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Transfer/SchemaConfig.php',
         'HyperFields\\UserField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/UserField.php',
         'HyperFields\\Validation\\SchemaValidator' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Validation/SchemaValidator.php',
+        'WicketPortus\\Access\\DomainGatekeeper' => __DIR__ . '/../..' . '/src/Access/DomainGatekeeper.php',
         'WicketPortus\\Contracts\\ConfigModuleInterface' => __DIR__ . '/../..' . '/src/Contracts/ConfigModuleInterface.php',
         'WicketPortus\\Contracts\\OptionGroupProviderInterface' => __DIR__ . '/../..' . '/src/Contracts/OptionGroupProviderInterface.php',
         'WicketPortus\\Contracts\\SanitizableModuleInterface' => __DIR__ . '/../..' . '/src/Contracts/SanitizableModuleInterface.php',

@@ -6,6 +6,7 @@ namespace WicketPortus;
 
 use HyperFields\Admin\ExportImportPageConfig;
 use HyperFields\Admin\ExportImportUI;
+use WicketPortus\Access\DomainGatekeeper;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
@@ -146,6 +147,10 @@ class Plugin
      */
     public function register_portus_data_tools_page(): void
     {
+        if (!DomainGatekeeper::current_user_is_allowed()) {
+            return;
+        }
+
         if (!class_exists(ExportImportUI::class)) {
             add_action('admin_notices', [$this, 'render_missing_hyperfields_notice']);
 
@@ -219,6 +224,10 @@ class Plugin
      */
     public function render_portus_data_tools_page(): void
     {
+        if (!DomainGatekeeper::current_user_is_allowed()) {
+            DomainGatekeeper::deny();
+        }
+
         if (!current_user_can('manage_options')) {
             wp_die(esc_html__('You are not allowed to access this page.', 'wicket-portus'));
         }

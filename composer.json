@@ -1,19 +1,41 @@
 {
-  "name": "industrialdev/wicket-wp-portus",
+  "authors": [
+    {
+      "email": "info@wicket.io",
+      "homepage": "https://wicket.io",
+      "name": "Wicket Inc."
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "WicketPortus\\": "src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "platform-check": false,
+    "sort-packages": true
+  },
   "description": "Makes Wicket site configuration portable, reviewable, and repeatable.",
-  "type": "wordpress-plugin",
+  "homepage": "https://github.com/industrialdev/wicket-wp-portus",
+  "keywords": [
+    "wordpress",
+    "wicket",
+    "configuration",
+    "export",
+    "import",
+    "portability"
+  ],
   "license": "GPL-2.0-or-later",
+  "minimum-stability": "RC",
+  "name": "industrialdev/wicket-wp-portus",
+  "prefer-stable": true,
   "require": {
     "php": ">=8.3",
     "estebanforge/hyperfields": "^1"
   },
   "require-dev": {
     "friendsofphp/php-cs-fixer": "^3"
-  },
-  "autoload": {
-    "psr-4": {
-      "WicketPortus\\": "src/"
-    }
   },
   "scripts": {
     "check": [
@@ -22,9 +44,13 @@
     "cs:fix": "php-cs-fixer fix",
     "cs:format": "php-cs-fixer fix",
     "cs:lint": "php-cs-fixer fix --dry-run --diff",
-    "production": "composer install && composer cs:fix && composer install --no-dev --optimize-autoloader"
+    "production": "composer install && composer cs:fix && composer install --no-dev --optimize-autoloader",
+    "setup-hooks": "mkdir -p .git/hooks && cp .ci/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo 'Git hooks installed to .git/hooks/pre-push'"
   },
-  "config": {
-    "optimize-autoloader": true
-  }
+  "scripts-descriptions": {
+    "cs:format": "Run PHP CS Fixer to fix coding standards issues",
+    "cs:lint": "Run PHP CS Fixer to check coding standards"
+  },
+  "type": "wordpress-plugin",
+  "version": "0.1.1"
 }

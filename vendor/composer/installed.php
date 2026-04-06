@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => 'industrialdev/wicket-wp-portus',
-        'pretty_version' => 'dev-main',
-        'version' => 'dev-main',
-        'reference' => 'd3008e8a9e0f1b3dde6a5a6f785a4d23f7424efa',
+        'pretty_version' => '0.1.1',
+        'version' => '0.1.1.0',
+        'reference' => null,
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -20,9 +20,9 @@
             'dev_requirement' => false,
         ),
         'industrialdev/wicket-wp-portus' => array(
-            'pretty_version' => 'dev-main',
-            'version' => 'dev-main',
-            'reference' => 'd3008e8a9e0f1b3dde6a5a6f785a4d23f7424efa',
+            'pretty_version' => '0.1.1',
+            'version' => '0.1.1.0',
+            'reference' => null,
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
