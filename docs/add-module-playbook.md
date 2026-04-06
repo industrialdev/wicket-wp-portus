@@ -1,39 +1,44 @@
-# Portus Module Playbook (Fictional Plugin Example)
+# Portus Module Playbook
 
-This guide shows exactly how to add a new Portus module for a fictional plugin, with copy-paste examples and a step-by-step workflow.
+Step-by-step guide to adding a new module to Portus, with a complete worked example.
 
-Fictional plugin used in this walkthrough:
+The fictional plugin used throughout:
 
-- Plugin name: `Wicket Events`
+- Plugin name: **Wicket Events**
 - WordPress option key: `wicket_events_options`
 - Portus module key: `wicket_events`
 
-## Step 1. Define the module contract first
+---
 
-Before writing code, lock these 4 items:
+## Step 1 — Define the Module Contract
 
-1. Module key: stable, snake_case, never reused for another meaning.
-2. Payload shape: exact array keys the manifest will contain.
-3. Import mode: `merge` or `replace`.
-4. Sensitive fields policy: which keys must be removed in `template` mode.
+Before writing code, lock down four things:
+
+1. **Module key** — stable, unique, snake_case. Once a manifest is shipped with this key, it cannot be renamed without a breaking change.
+2. **Payload shape** — exact array keys the manifest will contain under `modules.wicket_events`.
+3. **Import mode** — `merge` (preserve existing keys not in payload) or `replace` (overwrite entirely).
+4. **Sensitive fields policy** — which keys must be absent from `template` exports.
 
 Example contract for `wicket_events`:
 
-- Export payload:
-  - `settings` (array) -> raw value from `wicket_events_options`
-- Import behavior:
-  - Validate `settings` is present and is an array.
-  - Use HyperFields transfer adapter in `merge` mode.
-- Template sanitization:
-  - Remove `api_key` and `webhook_secret`.
+```
+Export payload:
+  settings (array) — raw value of wicket_events_options
 
-## Step 2. Create the module class
+Import:
+  Validate: 'settings' must be present and an array.
+  Mode: merge
+  Write: wicket_events_options
 
-Create file:
+Template sanitization:
+  Remove: api_key, webhook_secret
+```
 
-- `src/Modules/WicketEventsModule.php`
+---
 
-Example implementation:
+## Step 2 — Create the Module Class
+
+Create `src/Modules/WicketEventsModule.php`:
 
 ```php
 <?php
@@ -155,11 +160,20 @@ final class WicketEventsModule implements ConfigModuleInterface, OptionGroupProv
 }
 ```
 
-## Step 3. Register the module with Portus
+**Key patterns to follow:**
 
-Recommended: register from integration code using `wicket_portus_register_modules`.
+- Always call `validate()` at the top of `import()` and return early if it fails.
+- Check `$options['dry_run']` (defaults to `true` — never assume false).
+- Use an explicit allow-list for option keys — never write keys that weren't in the payload.
+- `sanitize()` must return a new array. Do not mutate `$payload` in place.
 
-Example (`mu-plugin` or your plugin bootstrap):
+---
+
+## Step 3 — Register the Module
+
+The preferred approach is registration via the `wicket_portus_register_modules` action. This avoids modifying Portus core.
+
+Add to your plugin's bootstrap (or an `mu-plugin`):
 
 ```php
 <?php
@@ -181,17 +195,21 @@ add_action('wicket_portus_register_modules', static function (ModuleRegistry $re
 });
 ```
 
-This avoids editing Portus core just to add one new module.
+If you're adding a core Portus module (not an extension), add it to `Plugin::register_modules()` instead.
 
-## Step 4. Verify it appears in UI and manifest
+**Replacing a core module:** register a new class with the same `key()` return value. The registry silently overwrites the previous entry.
 
-In wp-admin:
+---
 
-1. Open `Wicket Settings -> Portus`.
-2. Confirm module appears in export options (label from `option_groups()`).
-3. Export in `template` mode and inspect `modules.wicket_events` in JSON.
-4. Export in `full` mode and confirm sensitive keys are present only when expected.
-5. Import same file via preview first, then import.
+## Step 4 — Verify in the UI
+
+1. Open **Wicket → Portus**.
+2. Confirm the module label (from `option_groups()`) appears in the export selection list.
+3. Export in `template` mode. Inspect `modules.wicket_events` — sensitive keys must be absent.
+4. Export in `full` mode. Confirm sensitive keys are present.
+5. Upload the `full` export via Preview. Confirm the dry-run diff shows the expected changes.
+6. Import. Confirm the result summary lists the option key as imported.
+7. Re-import the same file. Confirm the key appears in `skipped` (no changes detected).
 
 Expected manifest section:
 
@@ -208,28 +226,42 @@ Expected manifest section:
 }
 ```
 
-## Step 5. Add documentation updates
+---
 
-When adding a real module, update these docs in the same PR:
+## Step 5 — Update Documentation
 
-- `README.md` -> module list and behavior summary.
-- `docs/manifest-reference.md` -> payload shape + import behavior.
-- `docs/developer-guide.md` -> module inventory / extension notes if needed.
+When shipping a new module, update these files in the same PR:
 
-## Step 6. Use this developer checklist
+- `README.md` → add a row to the module table.
+- `docs/manifest-reference.md` → add the payload shape and import behaviour.
+- `docs/developer-guide.md` → update the module key list if it is a core module.
 
-- [ ] Module key is unique and stable.
-- [ ] `validate()` rejects malformed payloads with clear messages.
-- [ ] `import()` handles `dry_run` correctly.
-- [ ] Sensitive fields are removed in `template` exports.
-- [ ] Option allow-list is strict (no wildcard writes).
-- [ ] Module is visible in Portus UI (if intended).
-- [ ] Export -> preview -> import path tested end-to-end.
+---
 
-## Common mistakes to avoid
+## Developer Checklist
 
-- Reusing a module key for a new payload contract.
-- Writing options that are not explicitly allow-listed.
-- Skipping validation and trusting manifest payload blindly.
-- Putting environment secrets in template exports.
-- Editing Portus core registration when an action hook is enough.
+- [ ] Module key is unique, stable, and snake_case.
+- [ ] `key()` return value is documented and never reused for a different payload shape.
+- [ ] `validate()` returns clear, user-readable error strings for every invalid state.
+- [ ] `import()` correctly handles `dry_run: true` (no writes) and `dry_run: false` (real writes).
+- [ ] `sanitize()` covers all sensitive fields and does not mutate its argument.
+- [ ] Option allow-list in `import()` is explicit — no wildcard or dynamic key writes.
+- [ ] Module is selectable in the export UI via `OptionGroupProviderInterface` (if applicable).
+- [ ] Full export → preview → import → re-import round-trip tested end-to-end.
+- [ ] Docs updated in the same PR.
+
+---
+
+## Common Mistakes
+
+**Reusing a module key for a new payload shape.** Old manifests with the original shape will break silently on import. Add a new key instead.
+
+**Trusting the manifest payload blindly.** Always call `validate()` before touching `$payload` keys in `import()`. Manifests can be hand-edited or corrupted.
+
+**Assuming `dry_run` is false.** The preview step calls `import()` with `dry_run: true`. If your code writes unconditionally, data is corrupted during preview.
+
+**Writing options not in the allow-list.** This can clobber unrelated settings. Build the allow-list from `$payload` keys, not from `get_option()` discovery.
+
+**Putting environment secrets in template exports.** Implement `SanitizableModuleInterface` and call `SensitiveFieldsRegistry::for_module($this->key())` to get the full field list to strip.
+
+**Editing `Plugin::register_modules()` for a third-party module.** Use the `wicket_portus_register_modules` action instead.

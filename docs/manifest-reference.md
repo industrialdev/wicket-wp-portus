@@ -1,143 +1,273 @@
 # Portus Manifest Reference
 
-This file describes the manifest and module payloads as implemented in `src/` today.
+Complete specification for the Portus manifest format. Use this as the source of truth when building tooling that reads or produces Portus manifests.
+
+---
 
 ## Envelope
 
-Produced by `WicketPortus\Manifest\TransferOrchestrator::export()`.
+Every Portus manifest shares the same top-level envelope, regardless of which modules it contains.
 
-- `schema_version`: `1`
-- `type`: `wicket_portus_manifest`
-- `generated_at`: ISO-8601 timestamp
-- `site`:
-  - `url`: `get_site_url()`
-  - `environment`: `WP_ENVIRONMENT_TYPE` if defined, else `production`
-- `modules`: module payload map
-- `errors`: array
-- `export_mode`: `template` or `full`
+```json
+{
+  "schema_version": 1,
+  "type": "wicket_portus_manifest",
+  "generated_at": "2025-01-01T12:00:00+00:00",
+  "export_mode": "template",
+  "site": {
+    "url": "https://example.com",
+    "environment": "staging"
+  },
+  "modules": { },
+  "errors": []
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `schema_version` | integer | Always `1`. Increment only on breaking payload changes. |
+| `type` | string | Always `wicket_portus_manifest`. Used to reject non-Portus files. |
+| `generated_at` | string | ISO-8601 timestamp of when the manifest was produced. |
+| `export_mode` | string | `template`, `full`, or `developer`. |
+| `site.url` | string | `get_site_url()` of the source environment. |
+| `site.environment` | string | Value of `WP_ENVIRONMENT_TYPE`, or `production` if not defined. |
+| `modules` | object | Module payloads, keyed by module key. |
+| `errors` | array | Errors encountered during export. Normally empty. |
+
+**Volatile fields** — excluded from diff comparisons because they change every export and carry no semantic meaning:
+- `generated_at`
+- `errors`
+- `export_mode`
+
+---
 
 ## Export Modes
 
-- `template`:
-  - Applies only to modules implementing `SanitizableModuleInterface`
-  - Currently this is `wicket_settings`
-  - Fields removed come from `SensitiveFieldsRegistry` (+ `wicket_portus_sensitive_fields` filter)
-- `full`:
-  - Exports module payloads without sanitization
+### `template`
+
+- Sensitive fields are removed by each module's `SanitizableModuleInterface::sanitize()`.
+- Post-like numeric `id` fields are stripped from records that have `post_type`, `post_name`, and `post_title` siblings (filterable via `wicket_portus/export/template_strip_database_ids`).
+- Safe to store in version control or share cross-client.
+
+### `full`
+
+- Module payloads are exported without sanitisation.
+- All values including credentials, API keys, and environment URLs are present.
+- Requires operator confirmation before download.
+
+### `developer`
+
+- Same as `full`, plus developer-only modules (e.g. `developer_wp_options_snapshot`) are included regardless of selection.
+- Requires two confirmation checkboxes.
+
+---
 
 ## Module Payloads
 
 ### `site_inventory`
 
-Export payload:
+```json
+{
+  "plugins": [
+    {
+      "plugin": "wicket-wp-base-plugin/wicket.php",
+      "name": "Wicket Base Plugin",
+      "version": "2.2.52",
+      "active": true
+    }
+  ]
+}
+```
 
-- `plugins`: array of rows:
-  - `plugin` (plugin file path)
-  - `name`
-  - `version`
-  - `active` (bool)
+**Import behaviour:**
+- Read-only comparison; no direct writes.
+- Warns on missing plugins or version mismatches.
+- Plugin activation/deactivation is queued as deferred changes (applied on next `admin_init`).
 
-Import behavior:
-
-- Read-only checks only
-- Warns on missing plugin or version mismatch
-- Marks each as skipped with reason: activation/deactivation deferred
+---
 
 ### `wicket_settings`
 
-Export payload:
+```json
+{
+  "wicket_admin_settings_app_name": "My Wicket Site",
+  "wicket_admin_settings_environment": "production",
+  "wicket_admin_settings_prod_api_endpoint": "[REDACTED]"
+}
+```
 
-- Raw value of WordPress option `wicket_settings` (array)
+**Import behaviour:**
+- Validates payload is a non-empty array.
+- Writes via HyperFields option transfer in `replace` mode.
+- Adds a sensitive-data warning to the import result.
 
-Import behavior:
+**Template mode:** removes all fields listed under `wicket_settings` in `SensitiveFieldsRegistry` plus the global credential patterns. See [developer-guide.md → Sensitive Fields](developer-guide.md#sensitive-fields--template-mode) for the complete list.
 
-- Validates payload is a non-empty array
-- Uses HyperFields option transfer in `replace` mode
-- Adds sensitive-data warning in result messages
-
-Template mode sanitization:
-
-- Removes configured sensitive keys for module key `wicket_settings`
+---
 
 ### `memberships`
 
-Export payload:
+```json
+{
+  "plugin_options": {
+    "tiers_enabled": true,
+    "renewal_grace_days": 30
+  }
+}
+```
 
-- `plugin_options`: value of option `wicket_membership_plugin_options` (array)
+**Import behaviour:**
+- Requires `plugin_options` key with an array value.
+- Writes `wicket_membership_plugin_options` via HyperFields in `replace` mode.
 
-Import behavior:
-
-- Requires `plugin_options` key and array value
-- Uses HyperFields option transfer in `replace` mode on `wicket_membership_plugin_options`
+---
 
 ### `gravity_forms_wicket_plugin`
 
-Export payload:
+```json
+{
+  "wicket_gf_pagination_sidebar_layout": "default",
+  "wicket_gf_member_fields": { },
+  "wicket_gf_slug_mapping": {
+    "registration": 3,
+    "renewal": 7
+  }
+}
+```
 
-- `wicket_gf_pagination_sidebar_layout`
-- `wicket_gf_member_fields`
-- `wicket_gf_slug_mapping`
-  - If stored as JSON string, it is decoded to array when valid JSON
+**Import behaviour:**
+- Missing keys produce warnings, not errors.
+- `wicket_gf_slug_mapping` is JSON-encoded before write if supplied as an array.
+- Writes each option via HyperFields in `replace` mode.
 
-Import behavior:
-
-- Missing keys are warnings (not hard errors)
-- If `wicket_gf_slug_mapping` is array, it is JSON-encoded before write
-- Uses HyperFields option transfer in `replace` mode
+---
 
 ### `account_centre`
 
-Export payload:
+```json
+{
+  "option_names": [
+    "carbon_fields_container_wicket_acc_options_field_one"
+  ],
+  "options": {
+    "carbon_fields_container_wicket_acc_options_field_one": "value"
+  }
+}
+```
 
-- `option_names`: discovered names matching:
-  - `carbon_fields_container_wicket_acc_options%`
-  - `_carbon_fields_container_wicket_acc_options%`
-  - filterable via `wicket_portus_acc_option_name_patterns`
-- `options`: exported values for those names
+**Export:** discovers option names via SQL `LIKE` patterns:
+- `carbon_fields_container_wicket_acc_options%`
+- `_carbon_fields_container_wicket_acc_options%`
 
-Import behavior:
+Patterns are filterable via `wicket_portus_acc_option_name_patterns`.
 
-- Requires `options` array
-- Allowed keys come from `option_names` when provided; otherwise `options` keys
-- Uses HyperFields option transfer in `replace` mode
+**Import behaviour:**
+- Requires `options` array.
+- Allowed keys are `option_names` when provided; otherwise all keys in `options`.
+- Writes via HyperFields in `replace` mode.
 
-### `theme_acf_options`
+---
 
-Export payload:
+### `financial_fields`
 
-- `option_names`: discovered names matching:
-  - `options_%`
-  - `_options_%`
-  - filterable via `wicket_portus_theme_acf_option_name_patterns`
-- `options`: exported values for those names
+```json
+{
+  "wicket_finance_enable_system": true,
+  "wicket_finance_customer_visible_categories": ["membership"],
+  "wicket_finance_display_order_confirmation": true
+}
+```
 
-Import behavior:
+**Import behaviour:**
+- Writes each recognised option via HyperFields in `replace` mode.
 
-- Requires `options` array
-- Allowed keys come from `option_names` when provided; otherwise `options` keys
-- Uses HyperFields option transfer in `replace` mode
+---
 
-## Admin Page Wiring
+### `woocommerce_emails`
 
-`WicketPortus\Plugin` registers:
+```json
+{
+  "woocommerce_email_options": { }
+}
+```
 
-- submenu page under `wicket-settings`:
-  - page title: `Portus Export / Import`
-  - menu label: `Portus`
-  - slug: `wicket-portus-data-tools`
-- page capability: `manage_options`
-- HyperFields page assets enqueued only on this page
+**Import behaviour:**
+- Writes WooCommerce email option values via HyperFields in `replace` mode.
 
-If HyperFields is unavailable, Portus shows admin notices and does not render the data tools UI.
+---
 
-## Import Result Shape
+### `curated_pages`
 
-Module imports return `WicketPortus\Manifest\ImportResult::to_array()`:
+```json
+{
+  "pages": [
+    {
+      "post_type": "page",
+      "post_name": "about-us",
+      "post_title": "About Us",
+      "post_status": "publish"
+    }
+  ]
+}
+```
 
-- `dry_run` (bool)
-- `success` (bool)
-- `imported` (string[])
-- `skipped` (array of `{ key, reason }`)
-- `warnings` (string[])
-- `errors` (string[])
+**Template mode:** numeric `id` fields are stripped from each record.
 
+---
+
+### `my_account_pages`
+
+Same shape as `curated_pages`. Disabled by default.
+
+---
+
+### `content_pages` / `content_my_account`
+
+Post type export modules. Disabled by default. Shape matches `curated_pages`.
+
+---
+
+### `developer_wp_options_snapshot`
+
+Available in developer export mode only.
+
+```json
+{
+  "options": {
+    "blogname": "My Site",
+    "active_plugins": ["..."]
+  }
+}
+```
+
+**Import behaviour:**
+- This module is export-only by default. Import writes are explicitly gated.
+- Treat this payload as a diagnostic reference, not an import target.
+
+---
+
+## ImportResult Shape
+
+Each module import returns a result that is serialised and displayed in the admin UI:
+
+```json
+{
+  "dry_run": true,
+  "success": true,
+  "imported": ["option_key_one", "option_key_two"],
+  "skipped": [
+    { "key": "option_key_three", "reason": "no changes detected" }
+  ],
+  "warnings": ["Sensitive data is present in this module."],
+  "errors": []
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dry_run` | bool | `true` for preview runs, `false` for real imports. |
+| `success` | bool | `true` when `errors` is empty. |
+| `imported` | string[] | Option keys that were (or would be) written. |
+| `skipped` | array | Keys skipped with a `key` + `reason` pair each. |
+| `warnings` | string[] | Non-fatal operator notices. |
+| `errors` | string[] | Fatal problems. If any present, `success` is `false`. |
