@@ -31,14 +31,7 @@ Activate through WordPress Admin → Plugins. The plugin appears under **Wicket 
 
 ## Documentation
 
-See the [`docs/`](docs/) folder for full documentation.
-
-- [docs/index.md](docs/index.md) — Documentation index
-- [docs/end-user-guide.md](docs/end-user-guide.md) — Operator workflow for export and import
-- [docs/developer-guide.md](docs/developer-guide.md) — Architecture, modules, extension points, and development setup
-- [docs/add-module-playbook.md](docs/add-module-playbook.md) — How to add a new module
-- [docs/manifest-reference.md](docs/manifest-reference.md) — Manifest schema and module payload reference
-- [docs/access-control.md](docs/access-control.md) — Domain-based access gate and configuration
+For complete documentation, see **[docs/index.md](docs/index.md)**.
 
 ## License
 
