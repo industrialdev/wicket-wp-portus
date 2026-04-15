@@ -1,3 +1,9 @@
+---
+title: "Portus End-User Guide"
+audience: [end-user, implementer]
+wp_admin_path: "Wicket → Portus"
+---
+
 # Portus End-User Guide
 
 Portus is the configuration portability tool for the Wicket WP Stack. It lets you snapshot a site's Wicket settings into a JSON manifest, move that manifest to another environment, and apply it — all from a single WordPress admin page.
@@ -9,7 +15,7 @@ Operators and site administrators who export and import Wicket configuration thr
 ## Before You Start
 
 - **Required capability:** `manage_options`
-- **Required email domain:** your WordPress account email must belong to an allowed domain (default: `wicket.io`). See [access-control.md](access-control.md) if you need to grant access to a third-party team.
+- **Required email domain:** your WordPress account email must belong to an allowed domain (default: `wicket.io`). See [access-control.md](../engineering/access-control.md) if you need to grant access to a third-party team.
 - **Menu path:** Wicket → Portus
 - **Always take a backup** and verify a rollback path before importing into a production environment.
 - If Portus does not appear in the menu, your email address is not permitted. Contact a Wicket team member.
@@ -131,7 +137,7 @@ Modules marked *disabled by default* can be enabled by a developer via the `wick
 
 ### The Portus menu item does not appear
 
-Your user account email domain is not on the allowed list. Contact your Wicket account manager or a developer to add your domain via `WICKET_PORTUS_ALLOWED_DOMAINS` in `wp-config.php`. See [access-control.md](access-control.md).
+Your user account email domain is not on the allowed list. Contact your Wicket account manager or a developer to add your domain via `WICKET_PORTUS_ALLOWED_DOMAINS` in `wp-config.php`. See [access-control.md](../engineering/access-control.md).
 
 ### The Portus page shows a HyperFields error
 

@@ -11,5 +11,7 @@
 
 ## Guides (End Users)
 - [Export and Import Configuration](guides/portus-user-guide.md) — Step-by-step export/import flow for operators
-- [Hackweek Plan](guides/project-portus-hackweek-plan.md) — Planning history
-- [Accelerated Execution Plan](guides/project-portus-accelerated-execution-plan.md) — Planning history
+
+## Planning History (Archive)
+- [Hackweek Plan](guides/project-portus-hackweek-plan.md) — Historical planning artifact; not runtime documentation
+- [Accelerated Execution Plan](guides/project-portus-accelerated-execution-plan.md) — Historical planning artifact; not runtime documentation

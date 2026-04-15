@@ -1,3 +1,10 @@
+---
+title: "Portus Access Control"
+audience: [developer, implementer]
+php_class: WicketPortus\Access\DomainGatekeeper
+source_files: ["src/Access/DomainGatekeeper.php"]
+---
+
 # Portus Access Control
 
 Portus enforces domain-based access on top of WordPress capabilities. This document explains how the gate works and how to configure it.

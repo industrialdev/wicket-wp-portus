@@ -1,3 +1,9 @@
+---
+title: "Portus Manifest Reference"
+audience: [developer]
+source_files: ["src/Manifest/TransferOrchestrator.php", "src/Modules/"]
+---
+
 # Portus Manifest Reference
 
 Complete specification for the Portus manifest format. Use this as the source of truth when building tooling that reads or produces Portus manifests.
@@ -224,6 +230,38 @@ Same shape as `curated_pages`. Disabled by default.
 ### `content_pages` / `content_my_account`
 
 Post type export modules. Disabled by default. Shape matches `curated_pages`.
+
+---
+
+### `theme_acf_options` *(optional — not auto-registered)*
+
+`ThemeAcfOptionsModule` must be registered manually via the `wicket_portus_register_modules` action. See [developer-guide.md → Optional Module: ThemeAcfOptionsModule](developer-guide.md#optional-module-themeacfoptionsmodule).
+
+```json
+{
+  "option_names": [
+    "options_my_theme_colour",
+    "_options_my_theme_colour"
+  ],
+  "options": {
+    "options_my_theme_colour": "#ffffff",
+    "_options_my_theme_colour": "field_abc123"
+  }
+}
+```
+
+**Export:** discovers option names via SQL `LIKE` patterns:
+- `options_%`
+- `_options_%`
+
+Patterns are filterable via `wicket_portus_theme_acf_option_name_patterns`.
+
+**Import behaviour:**
+- Requires `options` array.
+- Allowed keys are `option_names` when provided; otherwise all keys in `options`.
+- Writes via HyperFields in `merge` mode.
+
+**Template mode:** no sanitisation — this module does not implement `SanitizableModuleInterface`. Handle carefully if theme options contain credentials.
 
 ---
 

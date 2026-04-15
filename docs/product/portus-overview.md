@@ -1,8 +1,8 @@
 ---
 title: "Portus Overview"
 audience: [implementer, support]
+wp_admin_path: "Wicket → Portus"
 php_class: WicketPortus\Plugin
-source_files: ["src/Plugin.php", "src/Manifest/TransferOrchestrator.php"]
 ---
 
 # Portus Overview

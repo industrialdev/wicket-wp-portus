@@ -1,3 +1,9 @@
+---
+title: "Portus Module Playbook"
+audience: [developer]
+source_files: ["src/Contracts/ConfigModuleInterface.php", "src/Contracts/SanitizableModuleInterface.php", "src/Contracts/OptionGroupProviderInterface.php", "src/Manifest/ImportResult.php"]
+---
+
 # Portus Module Playbook
 
 Step-by-step guide to adding a new module to Portus, with a complete worked example.

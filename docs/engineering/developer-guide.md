@@ -1,3 +1,10 @@
+---
+title: "Portus Developer Guide"
+audience: [developer]
+php_class: WicketPortus\Plugin
+source_files: ["src/Plugin.php", "src/Manifest/TransferOrchestrator.php", "src/Registry/ModuleRegistry.php", "src/Manifest/ImportResult.php"]
+---
+
 # Portus Developer Guide
 
 Everything a developer needs to understand, extend, debug, and contribute to Wicket Portus.
@@ -66,7 +73,7 @@ wicket-wp-portus/
 │   │   ├── CuratedPagesExportModule.php
 │   │   ├── MyAccountPagesExportModule.php
 │   │   ├── PostTypeExportModule.php
-│   │   ├── ThemeAcfOptionsModule.php
+│   │   ├── ThemeAcfOptionsModule.php  # Optional — not auto-registered; see Extension Points
 │   │   └── DeveloperWpOptionsSnapshotModule.php
 │   ├── Registry/
 │   │   ├── ModuleRegistry.php        # Register, disable, look up modules
@@ -267,6 +274,32 @@ add_action('wicket_portus_register_modules', function (WicketPortus\Registry\Mod
 });
 ```
 
+### Optional Module: ThemeAcfOptionsModule
+
+`ThemeAcfOptionsModule` (key: `theme_acf_options`) ships with Portus but is **not registered automatically**. It exports and imports WordPress option rows that match ACF options-page naming conventions (`options_%`, `_options_%`).
+
+Register it via the `wicket_portus_register_modules` action:
+
+```php
+use WicketPortus\Modules\ThemeAcfOptionsModule;
+use WicketPortus\Registry\ModuleRegistry;
+use WicketPortus\Support\HyperfieldsOptionTransfer;
+use WicketPortus\Support\WordPressOptionReader;
+
+add_action('wicket_portus_register_modules', static function (ModuleRegistry $registry): void {
+    $registry->register(
+        new ThemeAcfOptionsModule(
+            new WordPressOptionReader(),
+            new HyperfieldsOptionTransfer(),
+        )
+    );
+});
+```
+
+The SQL discovery patterns are filterable via `wicket_portus_theme_acf_option_name_patterns`. The module does not implement `SanitizableModuleInterface` — ACF options values are not sanitised in template mode. If your theme options contain credentials, either avoid using this module or implement a wrapper that strips sensitive keys.
+
+---
+
 **`wicket_portus/import/after`** — fired after a successful real import.
 
 ```php
@@ -297,7 +330,7 @@ Default disabled: `content_pages`, `content_my_account`, `my_account_pages`.
 
 **`wicket_portus_acc_option_name_patterns`** — adjust the SQL `LIKE` patterns used to discover Account Centre option names.
 
-**`wicket_portus_theme_acf_option_name_patterns`** — adjust SQL `LIKE` patterns for Theme ACF options discovery.
+**`wicket_portus_theme_acf_option_name_patterns`** — adjust SQL `LIKE` patterns for Theme ACF options discovery. Used by `ThemeAcfOptionsModule` (see below). Default patterns: `options_%`, `_options_%`.
 
 **`wicket_portus/export/template_strip_database_ids`** — toggle numeric DB `id` stripping in template exports.
 
