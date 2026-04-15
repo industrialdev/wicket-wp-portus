@@ -1,5 +1,9 @@
 # Wicket Portus Changelog
 
+# 0.1.3
+- Dependency: bump HyperFields to 1.2.0.
+- HyperFields 1.2.0 introduces an optional React-based admin UI (`ReactField`), a full set of React field components, webpack build infrastructure, updated admin CSS (`hyperfields-admin.css` replaces `admin.css`), and enhanced multiselect JS. No changes to Portus module logic or manifest format.
+
 # 0.1.2
 - Security: deny Portus access to impersonated sessions from the User Switching plugin, even when the switched-to account has a permitted email domain.
 
