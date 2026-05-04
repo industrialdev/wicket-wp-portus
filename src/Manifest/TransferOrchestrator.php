@@ -401,7 +401,7 @@ class TransferOrchestrator
         }
 
         try {
-            $logger = Wicket()->log();
+            $logger = \Wicket()->log();
             if (!is_object($logger)) {
                 return;
             }
