@@ -137,14 +137,47 @@ Every Portus manifest shares the same top-level envelope, regardless of which mo
   "wicket_gf_slug_mapping": {
     "registration": 3,
     "renewal": 7
+  },
+  "per_form_settings": {
+    "3": {
+      "wicket_mdp_entity_type": "person",
+      "wicket_mdp_uuid_source_field": "5",
+      "fields": {
+        "5": {
+          "wicket_enable_mdp_mapping": true,
+          "wicket_mdp_target_object": "person",
+          "wicket_mdp_target_field": "first_name",
+          "wicket_field_slug": "first-name"
+        }
+      }
+    }
   }
 }
 ```
 
+| Key | Storage | Description |
+|-----|---------|-------------|
+| `wicket_gf_pagination_sidebar_layout` | wp_options | Pagination layout preference. |
+| `wicket_gf_member_fields` | wp_options | Member fields configuration. |
+| `wicket_gf_slug_mapping` | wp_options (JSON) | Canonical form slug → form ID mapping. |
+| `per_form_settings` | GF form display_meta | Per-form MDP config and per-field MDP/slug settings. Keyed by form ID (`"3"`). |
+
+**`per_form_settings` per-form keys:**
+- `wicket_mdp_entity_type` — `person` or `organization`
+- `wicket_mdp_uuid_source_field` — numeric field ID
+
+**`per_form_settings.*.fields` per-field keys:**
+- `wicket_enable_mdp_mapping` — boolean
+- `wicket_mdp_target_object` — target entity
+- `wicket_mdp_target_field` — target field name
+- `wicket_field_slug` — stable field identifier
+
 **Import behaviour:**
-- Missing keys produce warnings, not errors.
+- Missing wp_options keys produce skipped entries, not errors.
 - `wicket_gf_slug_mapping` is JSON-encoded before write if supplied as an array.
 - Writes each option via HyperFields in `replace` mode.
+- Per-form/per-field settings are applied via `GFAPI::update_form()`. Missing forms produce warnings, not errors.
+- Field-level settings are only applied when the target field exists in the form.
 
 ---
 
