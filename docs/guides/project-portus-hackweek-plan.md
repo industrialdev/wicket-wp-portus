@@ -74,7 +74,7 @@ It has several:
 - ACF JSON in the main theme and Account Centre plugin.
 - custom post types plus post meta in Memberships.
 - WooCommerce product and order meta in Financial Fields and Guest Checkout.
-- code-driven config in `wicket-lib-org-roster`.
+- code-driven config in `wicket-wp-organization-roster`.
 
 Because of that, Portus should not start as a full WordPress backup tool.
 
