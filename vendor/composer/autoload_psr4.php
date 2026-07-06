@@ -8,4 +8,5 @@ $baseDir = dirname($vendorDir);
 return array(
     'WicketPortus\\' => array($baseDir . '/src'),
     'HyperFields\\' => array($vendorDir . '/estebanforge/hyperfields/src'),
+    'Automattic\\Jetpack\\Autoloader\\' => array($vendorDir . '/automattic/jetpack-autoloader/src'),
 );

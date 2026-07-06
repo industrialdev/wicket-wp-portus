@@ -10,10 +10,19 @@
         'dev' => false,
     ),
     'versions' => array(
+        'automattic/jetpack-autoloader' => array(
+            'pretty_version' => 'v2.12.0',
+            'version' => '2.12.0.0',
+            'reference' => '632b69cfc73ed5505f2b03165e7f68d414d0da12',
+            'type' => 'composer-plugin',
+            'install_path' => __DIR__ . '/../automattic/jetpack-autoloader',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
         'estebanforge/hyperfields' => array(
-            'pretty_version' => '1.2.0',
-            'version' => '1.2.0.0',
-            'reference' => '4f5a7b9d584d56ebedebfaffe33d16d2f07832bb',
+            'pretty_version' => '1.3.6',
+            'version' => '1.3.6.0',
+            'reference' => '7b9b4778226e1f0512162363ebff5ad85a46b425',
             'type' => 'library',
             'install_path' => __DIR__ . '/../estebanforge/hyperfields',
             'aliases' => array(),

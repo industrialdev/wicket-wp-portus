@@ -11,6 +11,10 @@ declare(strict_types=1);
  * @since 1.0.0
  */
 
+if (!defined('HYPERFIELDS_DEFAULT_VERSION')) {
+    define('HYPERFIELDS_DEFAULT_VERSION', '1.3.6');
+}
+
 // Define global functions BEFORE early-return guards so they're always available.
 // Tests that run in separate processes need these functions even when HYPERFIELDS_BOOTSTRAP_LOADED is set.
 if (!function_exists('hyperfields_run_initialization_logic')) {
@@ -30,8 +34,27 @@ if (!function_exists('hyperfields_run_initialization_logic')) {
      */
     function hyperfields_run_initialization_logic(string $plugin_file_path, string $plugin_version): void
     {
-        // Ensure this logic runs only once.
+        // Ensure this logic runs only once, but only let a NEWER or equal
+        // version win once loaded. If a lower version somehow initialized first
+        // (e.g. an older vendored copy whose bootstrap ran before the newer
+        // copy's explicit init call), surface it loudly: we cannot undefine
+        // constants or un-register hooks, so the older instance keeps serving,
+        // but this log makes the stale election diagnosable instead of silent.
         if (defined('HYPERFIELDS_INSTANCE_LOADED')) {
+            $loaded_version = defined('HYPERFIELDS_LOADED_VERSION') ? HYPERFIELDS_LOADED_VERSION : '0.0.0';
+            if (version_compare($plugin_version, $loaded_version, '>')) {
+                if (function_exists('error_log')) {
+                    error_log(sprintf(
+                        'HyperFields: newer version %s at %s requested init after version %s was already loaded from %s. ' .
+                        'The older instance is serving. This means the multi-instance version election did not run before initialization; ' .
+                        'ensure the highest-version consumer calls hyperfields_run_initialization_logic() before any other copy initializes.',
+                        $plugin_version,
+                        $plugin_file_path,
+                        $loaded_version,
+                        defined('HYPERFIELDS_INSTANCE_LOADED_PATH') ? HYPERFIELDS_INSTANCE_LOADED_PATH : '(unknown)'
+                    ));
+                }
+            }
             return;
         }
         define('HYPERFIELDS_INSTANCE_LOADED', true);
@@ -120,7 +143,7 @@ if (!function_exists('hyperfields_register_candidate_for_tests')) {
      */
     function hyperfields_register_candidate_for_tests(): void
     {
-        $current_version = '1.1.0';
+        $current_version = HYPERFIELDS_DEFAULT_VERSION;
         $current_path = null;
         $composer_json_path = __DIR__ . '/composer.json';
         if (file_exists($composer_json_path)) {
@@ -151,36 +174,48 @@ if (!defined('ABSPATH') && !defined('HYPERFIELDS_TESTING_MODE')) {
     return;
 }
 
-// Use a unique constant to ensure this bootstrap logic runs only once.
+// Use a per-instance marker so each vendored copy registers its own
+// candidate for version election. A global early-return here would defeat
+// the multi-instance election: the first copy to load would set the flag and
+// every other copy's bootstrap would bail before registering, leaving only
+// the first-loaded (not necessarily highest-version) copy discoverable.
+// The candidate array is path-keyed for dedup, and the nested-autoloader
+// block below is guarded by $loadedFromVendorTree, so letting every copy
+// run its registration is safe.
+$hyperfields_bootstrap_path = realpath(__FILE__) ?: __FILE__;
 if (defined('HYPERFIELDS_BOOTSTRAP_LOADED')) {
-    return;
-}
+    // Another copy already ran the one-time autoloader include. Skip straight
+    // to candidate registration for THIS copy so the election can see it.
+} else {
+    define('HYPERFIELDS_BOOTSTRAP_LOADED', true);
 
-define('HYPERFIELDS_BOOTSTRAP_LOADED', true);
-
-// Composer autoloader.
-// When loaded from another package's /vendor tree, avoid loading nested vendor/autoload.php
-// to prevent duplicate Composer autoloader class declarations.
-$normalizedDir = str_replace('\\', '/', __DIR__);
-$loadedFromVendorTree = str_contains($normalizedDir, '/vendor/');
-if (!$loadedFromVendorTree && file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-} elseif (!$loadedFromVendorTree) {
-    // Display an admin notice if no autoloader is found, but continue so tests can register hooks/candidates.
-    add_action('admin_notices', function () {
-        echo '<div class="error"><p>' . esc_html__('HyperFields: Composer autoloader not found. Please run "composer install" inside the plugin folder.', 'hyperfields') . '</p></div>';
-    });
+    // Composer autoloader.
+    // When loaded from another package's /vendor tree, avoid loading nested vendor/autoload.php
+    // to prevent duplicate Composer autoloader class declarations.
+    $normalizedDir = str_replace('\\', '/', __DIR__);
+    $loadedFromVendorTree = str_contains($normalizedDir, '/vendor/');
+    if (!$loadedFromVendorTree && function_exists('wp_normalize_path') && file_exists(__DIR__ . '/vendor/autoload_packages.php')) {
+        require_once __DIR__ . '/vendor/autoload_packages.php';
+    }
+    if (!$loadedFromVendorTree && file_exists(__DIR__ . '/vendor/autoload.php')) {
+        require_once __DIR__ . '/vendor/autoload.php';
+    } elseif (!$loadedFromVendorTree) {
+        // Display an admin notice if no autoloader is found, but continue so tests can register hooks/candidates.
+        add_action('admin_notices', function () {
+            echo '<div class="error"><p>' . esc_html__('HyperFields: Composer autoloader not found. Please run "composer install" inside the plugin folder.', 'hyperfields') . '</p></div>';
+        });
+    }
 }
 
 // Get this instance's version and real path (resolving symlinks)
-$current_hyperfields_instance_version = '1.1.0';
+$current_hyperfields_instance_version = HYPERFIELDS_DEFAULT_VERSION;
 $current_hyperfields_instance_path = null;
 
 // Library mode: try to get version from composer.json or use a fallback
 $composer_json_path = __DIR__ . '/composer.json';
 if (file_exists($composer_json_path)) {
     $composer_data = json_decode(file_get_contents($composer_json_path), true);
-    $current_hyperfields_instance_version = $composer_data['version'] ?? '1.1.0';
+    $current_hyperfields_instance_version = $composer_data['version'] ?? HYPERFIELDS_DEFAULT_VERSION;
 }
 // Use bootstrap.php path as fallback for library mode
 $current_hyperfields_instance_path = realpath(__FILE__);
