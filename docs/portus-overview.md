@@ -67,7 +67,4 @@ Disabled modules can be enabled via the `wicket_portus_disabled_modules` filter.
 
 ## Documentation Links
 
-- [End-User Guide](../guides/portus-user-guide.md) — Export and import walkthrough for operators
-- [Developer Guide](../engineering/developer-guide.md) — Architecture, module system, extension points
-- [Manifest Reference](../engineering/manifest-reference.md) — Full manifest envelope and payload shapes
-- [Access Control](../engineering/access-control.md) — Domain gatekeeper details
+- [End-User Guide](./portus-user-guide.md) — Export and import walkthrough for operators

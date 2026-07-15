@@ -1,123 +1,49 @@
-# What This Plugin Does
+# Repository Guidelines
 
-Wicket Portus is a configuration portability tool for the Wicket WP Stack. It snapshots Wicket site settings into a portable JSON manifest (export), diffs an incoming manifest against the current environment (preview/dry-run), then writes the changes (import). Three export modes: `template` (sanitised), `full` (credentials included), `developer` (full + WP options snapshot).
+Wicket Portus is a configuration portability tool for the Wicket WP Stack. It snapshots Wicket plugin settings into a portable JSON manifest (export), diffs an incoming manifest against the current environment (preview/dry-run), then writes the changes (import). See [docs/product/portus-overview.md](docs/product/portus-overview.md) for export modes and modules, or [docs/engineering/developer-guide.md](docs/engineering/developer-guide.md) for architecture.
 
-## Commands
+## Project Structure & Module Organization
+This is a WordPress plugin rooted at `wicket-wp-portus.php`.
+- `src/`: PSR-4 PHP code under `WicketPortus\` — `Plugin` (singleton bootstrap), `Access/` (domain gate), `Contracts/` (module interfaces), `Manifest/` (export/import orchestration), `Modules/` (one class per Wicket plugin integration), `Registry/` (module + sensitive-field registries), `Support/` (option transfer helpers).
+- `assets/`: admin UI assets (JS, audio).
+- `docs/`: product/engineering/guides documentation tree — see `docs/AGENTS.md` for the schema.
+- `.ci/`: pre-push git hook source.
 
-```bash
-composer install          # Install all dependencies (including dev)
-composer setup-hooks      # Install the pre-push git hook
-composer cs:lint          # Check code style (dry run, no writes)
-composer cs:fix           # Fix code style
-composer production       # Fix style → remove dev deps → optimise autoloader (run before tagging)
-php -l <file>             # Quick PHP syntax check on a single file
-```
+## Build, Test, and Development Commands
+- `composer install`: install PHP dependencies (including dev).
+- `composer setup-hooks`: install the pre-push git hook.
+- `composer cs:lint`: check code style (dry run, no writes).
+- `composer cs:fix`: fix code style.
+- `composer production`: fix style → remove dev deps → optimise autoloader (run before tagging).
+- `php -l <file>`: quick PHP syntax check on a single file.
 
-No JS build step. `package.json` only pulls in Playwright for QA (lives in `../../../../../../qa/`).
+No JS build step. `package.json` only pulls in Playwright for the shared QA suite.
 
-Tests are in the shared QA suite at `../../../../../../qa/` — read `qa/README.md` and `qa/AGENTS.md` before adding any.
+## Coding Style & Naming Conventions
+- PHP 8.3+, `declare(strict_types=1);`, PSR-12 (`@PSR12`, `@PER-CS`, `@PHP82Migration` via `.php-cs-fixer.dist.php`).
+- PSR-4 namespace `WicketPortus\` → `src/`. Classes `PascalCase`, methods `camelCase`.
+- Favor small methods, early returns, and WordPress-native APIs/hooks.
 
 ## Architecture
+Module registry + transfer orchestrator pattern wrapping the HyperFields Export/Import library. Every module implements `ConfigModuleInterface` (`key()`, `export()`, `validate()`, `import()`); optional `SanitizableModuleInterface` and `OptionGroupProviderInterface`. Access to the admin page is gated by email domain (`WICKET_PORTUS_ALLOWED_DOMAINS`).
 
-### Bootstrap chain
+- [docs/engineering/developer-guide.md](docs/engineering/developer-guide.md) — bootstrap flow, module system, export/import pipelines, extension points (hooks/filters), debugging
+- [docs/engineering/manifest-reference.md](docs/engineering/manifest-reference.md) — manifest envelope and per-module payload shapes
+- [docs/engineering/access-control.md](docs/engineering/access-control.md) — domain-based access gate
+- [docs/engineering/add-module-playbook.md](docs/engineering/add-module-playbook.md) — worked example for adding a new module
 
-```
-wicket-wp-portus.php          plugins_loaded@99
-  Wicket_Portus_Bootstrap     loads autoloader, inits HyperFields
-    WicketPortus\Plugin        singleton; boot() wires everything
-      ModuleRegistry           holds ConfigModuleInterface instances keyed by string
-      TransferOrchestrator     export() / diff() / import() → HyperFields Manager
-      Admin UI (HyperFields ExportImportUI)
-```
+## Testing Guidelines
+Tests are in the shared QA suite at `../../../../../../qa/` (wicket-warden) — read `qa/README.md` and `qa/AGENTS.md` before adding any. No local `tests/` directory in this repo.
 
-`Plugin::boot()` registers all core modules, applies `wicket_portus_disabled_modules` filter, then fires `do_action('wicket_portus_register_modules', $registry)` — the extension point for third-party modules.
-
-### Module system
-
-Every module implements `ConfigModuleInterface`:
-
-- `key(): string` — stable snake_case key; never reuse for a different payload shape
-- `export(): array` — read current environment state
-- `validate(array $payload): array` — return `string[]` of errors; empty = valid
-- `import(array $payload, array $options = []): ImportResult` — respect `$options['dry_run']` (defaults `true`)
-
-Optional interfaces: `SanitizableModuleInterface` (sanitize sensitive fields in template mode), `OptionGroupProviderInterface` (appear in the export UI).
-
-`ImportResult` is built fluently: `ImportResult::dry_run()` or `::commit()`, then `->add_imported()`, `->add_skipped()`, `->add_warning()`, `->add_error()`.
-
-### Adding a module
-
-Full worked example in `docs/engineering/add-module-playbook.md`. Key rules:
-
-1. Always validate at the top of `import()` and return early on failure.
-2. Check `$options['dry_run']` — never assume false.
-3. Use an explicit option allow-list in `import()` — never write keys not in the payload.
-4. `sanitize()` must return a new array; do not mutate `$payload`.
-5. Register via `wicket_portus_register_modules` action, not by editing `Plugin::register_modules()`.
-6. Update `README.md` module table and `docs/engineering/manifest-reference.md` in the same PR.
-
-### Access control
-
-`DomainGatekeeper` blocks at two points: `admin_menu` (menu never added) and `render_portus_data_tools_page()` (`wp_die()` HTTP 403). Both conditions must be true: user email domain is in the allow-list, **and** no active User Switching impersonation session.
-
-Default allowed domain: `wicket.io` (hardcoded). Additional domains via `wp-config.php`:
-
-```php
-define('WICKET_PORTUS_ALLOWED_DOMAINS', 'example.com,partner.org');
-```
-
-### Deferred plugin changes
-
-Plugin activation/deactivation changes from an import are stored in a transient (`wicket_portus_deferred_plugin_changes`) and applied on the next `admin_init` via `maybe_apply_deferred_plugin_changes()`. They are never applied inline during import.
-
-### Manifest envelope
-
-```json
-{
-  "schema_version": 1,
-  "type": "wicket_portus_manifest",
-  "generated_at": "<ISO-8601>",
-  "export_mode": "template|full|developer",
-  "site": { "url": "...", "environment": "..." },
-  "modules": { "<key>": { ... } },
-  "errors": []
-}
-```
-
-Volatile fields excluded from diff: `generated_at`, `errors`, `export_mode`.
-
-## Key Extension Points
-
-| Hook/Filter | Purpose |
-|---|---|
-| `wicket_portus_register_modules` (action) | Register or replace modules |
-| `wicket_portus_disabled_modules` (filter) | Exclude modules from export/import |
-| `wicket_portus_sensitive_fields` (filter) | Extend sensitive field map |
-| `wicket_portus/import/after` (action) | Post-import hook (`$result`, `$mode`) |
-| `wicket_portus/export/template_strip_database_ids` (filter) | Toggle numeric ID stripping |
-| `wicket_portus_acc_option_name_patterns` (filter) | SQL LIKE patterns for Account Centre discovery |
-| `wicket_portus_theme_acf_option_name_patterns` (filter) | SQL LIKE patterns for Theme ACF discovery |
-
-`ThemeAcfOptionsModule` ships with the plugin but is **not auto-registered** — it must be wired manually via `wicket_portus_register_modules`.
-
-## Code Style
-
-PHP CS Fixer rules: `@PSR12`, `@PER-CS`, `@PHP82Migration`. Config in `.php-cs-fixer.dist.php`. Run `composer cs:lint` before committing; the pre-push hook blocks tag pushes if dev dependencies are present in `vendor/`.
-
-All PHP files: `declare(strict_types=1);`. Namespace root: `WicketPortus\` → `src/`.
-
-## Documentation
-
-`docs/AGENTS.md` defines doc writing rules: audiences, directory layout, required frontmatter, content conventions, and index maintenance. Read it before writing or editing any doc in `docs/`.
-
-| Doc | Audience |
-|---|---|
-| `docs/product/` | Implementers & support — WP admin settings |
-| `docs/engineering/` | Developers & agents — hooks, classes, architecture |
-| `docs/guides/` | End users — task-oriented how-tos |
-| `docs/index.md` | Entry point — update when any doc changes |
+## Commit & Pull Request Guidelines
+Git history favors conventional-commit-style, scope-specific messages (for example `feat: extend WicketGfOptionsModule with per-form and per-field GF settings`, `docs: restructure portus docs to match wicket-wp-base-plugin template`).
+- Keep commits focused; avoid mixed refactor/feature changes.
+- PRs should include: purpose, risk notes, and manual QA evidence (see the Testing Checklist in `docs/engineering/developer-guide.md`).
+- Link related issue/ticket and call out breaking or release-impacting changes.
+- Update `docs/` in the same PR as any hook/filter/module change — see `docs/AGENTS.md`.
 
 ## Release & Branch Workflow
+
 All work happens on branches. `main` is locked; changes land via peer-reviewed
 Pull Request (devs cross-review each other). Never commit to `main` directly, and never push or open a
 PR without explicit human approval.
@@ -129,3 +55,10 @@ create tags by hand. The bump level comes from a marker in the PR title
 `#major`, or `#norelease` (no release; use for docs/tooling-only merges).
 Conventional commit prefixes (`feat:`, `fix:`, `docs:`, ...) drive changelog
 grouping; a `!` (e.g. `feat!:`) flags a BREAKING change.
+
+
+## Security & WordPress-Specific Requirements
+- Sanitize, validate, and escape all input/output (`sanitize_text_field`, `esc_html`, etc.).
+- Enforce capability checks (`manage_options`) and nonces for admin actions.
+- Access is additionally gated by email domain — see [docs/engineering/access-control.md](docs/engineering/access-control.md).
+- Manifests exported in `full`/`developer` mode contain credentials; never commit them to version control.
