@@ -116,3 +116,16 @@ All PHP files: `declare(strict_types=1);`. Namespace root: `WicketPortus\` → `
 | `docs/engineering/` | Developers & agents — hooks, classes, architecture |
 | `docs/guides/` | End users — task-oriented how-tos |
 | `docs/index.md` | Entry point — update when any doc changes |
+
+## Release & Branch Workflow
+All work happens on branches. `main` is locked; changes land via peer-reviewed
+Pull Request (devs cross-review each other). Never commit to `main` directly, and never push or open a
+PR without explicit human approval.
+
+Merging a PR to `main` **auto-releases** via the `wicket-release-bot` GitHub
+App: version bump, `CHANGELOG.md` update, git tag. Never bump versions or
+create tags by hand. The bump level comes from a marker in the PR title
+(squash-merge makes it the commit message): _(none)_ / `#patch` = patch, `#minor`,
+`#major`, or `#norelease` (no release; use for docs/tooling-only merges).
+Conventional commit prefixes (`feat:`, `fix:`, `docs:`, ...) drive changelog
+grouping; a `!` (e.g. `feat!:`) flags a BREAKING change.
