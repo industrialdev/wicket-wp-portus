@@ -20,9 +20,9 @@
             'dev_requirement' => false,
         ),
         'estebanforge/hyperfields' => array(
-            'pretty_version' => '1.4.4',
-            'version' => '1.4.4.0',
-            'reference' => '989f28c55077dd04e4d8bd47f07875a62411e535',
+            'pretty_version' => '1.4.5',
+            'version' => '1.4.5.0',
+            'reference' => '6eaf9f33944dbe5df0d250ad13706baedc27e5ca',
             'type' => 'library',
             'install_path' => __DIR__ . '/../estebanforge/hyperfields',
             'aliases' => array(),
