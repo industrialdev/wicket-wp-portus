@@ -1,8 +1,8 @@
 <?php return array(
     'root' => array(
         'name' => 'industrialdev/wicket-wp-portus',
-        'pretty_version' => '0.1.4',
-        'version' => '0.1.4.0',
+        'pretty_version' => '0.1.5',
+        'version' => '0.1.5.0',
         'reference' => null,
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
@@ -20,17 +20,17 @@
             'dev_requirement' => false,
         ),
         'estebanforge/hyperfields' => array(
-            'pretty_version' => '1.3.6',
-            'version' => '1.3.6.0',
-            'reference' => '7b9b4778226e1f0512162363ebff5ad85a46b425',
+            'pretty_version' => '1.4.4',
+            'version' => '1.4.4.0',
+            'reference' => '989f28c55077dd04e4d8bd47f07875a62411e535',
             'type' => 'library',
             'install_path' => __DIR__ . '/../estebanforge/hyperfields',
             'aliases' => array(),
             'dev_requirement' => false,
         ),
         'industrialdev/wicket-wp-portus' => array(
-            'pretty_version' => '0.1.4',
-            'version' => '0.1.4.0',
+            'pretty_version' => '0.1.5',
+            'version' => '0.1.5.0',
             'reference' => null,
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
