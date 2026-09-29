@@ -110,11 +110,7 @@ class Plugin
          *
          * @param string[] $disabled Module keys to disable.
          */
-        $disabled = apply_filters('wicket_portus_disabled_modules', [
-            'content_pages',
-            'content_my_account',
-            'my_account_pages',
-        ]);
+        $disabled = apply_filters('wicket_portus_disabled_modules', []);
 
         if (!is_array($disabled)) {
             return;
@@ -599,8 +595,6 @@ class Plugin
             'account_centre' => 'Wicket Account Centre',
             'financial_fields' => 'Wicket Financial Fields',
             'site_inventory' => 'Plugin Inventory',
-            'curated_pages' => 'Curated Pages',
-            'my_account_pages' => 'Content: My Account Pages',
             'woocommerce_emails' => 'WooCommerce Emails',
             'developer_wp_options_snapshot' => 'Developer: Full wp_options Snapshot',
             default => ucwords(str_replace('_', ' ', $module_key)),
@@ -662,12 +656,10 @@ class Plugin
         return match ($module_key) {
             'wicket_settings' => 'API credentials and environment settings',
             'site_inventory' => 'Status + version checks',
-            'curated_pages' => 'Curated page list (shop, checkout, etc.)',
-            'my_account_pages' => 'My account page list (dashboard, profile, org, etc.)',
             'woocommerce_emails' => 'All email settings',
             'gravity_forms_wicket_plugin' => 'Slug mapping, pagination, member fields',
-            'memberships' => 'Plugin options + config posts',
-            'account_centre' => 'Plugin options + my-account pages',
+            'memberships' => 'Plugin options',
+            'account_centre' => 'Plugin options',
             'financial_fields' => 'Revenue deferral and finance mapping',
             default => '',
         };
