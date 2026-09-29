@@ -10,20 +10,15 @@ use WicketPortus\Access\DomainGatekeeper;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
-use WicketPortus\Modules\CuratedPagesExportModule;
 use WicketPortus\Modules\DeveloperWpOptionsSnapshotModule;
 use WicketPortus\Modules\FinancialFieldsModule;
-use WicketPortus\Modules\MyAccountPagesExportModule;
 use WicketPortus\Modules\PluginInventoryModule;
-use WicketPortus\Modules\PostTypeExportModule;
 use WicketPortus\Modules\WicketGfOptionsModule;
 use WicketPortus\Modules\WicketMembershipsModule;
 use WicketPortus\Modules\WicketSettingsModule;
 use WicketPortus\Modules\WooCommerceEmailModule;
 use WicketPortus\Registry\ModuleRegistry;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
-use WicketPortus\Support\MembershipConfigContentProfile;
-use WicketPortus\Support\PrivateContentPlusAttachmentsProfile;
 use WicketPortus\Support\WarningPrinter;
 use WicketPortus\Support\WordPressOptionReader;
 
@@ -93,9 +88,6 @@ class Plugin
         add_action('admin_init', [$this, 'maybe_apply_deferred_plugin_changes']);
         add_filter('hyperfields/import/ui_notice_message', [$this, 'filter_portus_import_notice_message'], 10, 3);
         add_filter('hyperfields/import/ui_notice_extra_html', [$this, 'filter_portus_import_notice_extra_html'], 10, 3);
-        MembershipConfigContentProfile::register();
-        PrivateContentPlusAttachmentsProfile::register();
-
         /*
          * Allows extensions to register additional modules.
          *
@@ -714,10 +706,6 @@ class Plugin
 
         $this->registry->register(new PluginInventoryModule());
         $this->registry->register(new DeveloperWpOptionsSnapshotModule());
-        $this->registry->register(new PostTypeExportModule('content_pages', 'page'));
-        $this->registry->register(new PostTypeExportModule('content_my_account', 'my-account'));
-        $this->registry->register(new CuratedPagesExportModule('curated_pages'));
-        $this->registry->register(new MyAccountPagesExportModule('my_account_pages'));
         $this->registry->register(new WicketSettingsModule($reader, $transfer));
         $this->registry->register(new WicketMembershipsModule($reader, $transfer));
         $this->registry->register(new WicketGfOptionsModule($reader, $transfer));
