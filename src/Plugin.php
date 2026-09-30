@@ -10,20 +10,15 @@ use WicketPortus\Access\DomainGatekeeper;
 use WicketPortus\Contracts\OptionGroupProviderInterface;
 use WicketPortus\Manifest\TransferOrchestrator;
 use WicketPortus\Modules\AccCarbonFieldsOptionsModule;
-use WicketPortus\Modules\CuratedPagesExportModule;
 use WicketPortus\Modules\DeveloperWpOptionsSnapshotModule;
 use WicketPortus\Modules\FinancialFieldsModule;
-use WicketPortus\Modules\MyAccountPagesExportModule;
 use WicketPortus\Modules\PluginInventoryModule;
-use WicketPortus\Modules\PostTypeExportModule;
 use WicketPortus\Modules\WicketGfOptionsModule;
 use WicketPortus\Modules\WicketMembershipsModule;
 use WicketPortus\Modules\WicketSettingsModule;
 use WicketPortus\Modules\WooCommerceEmailModule;
 use WicketPortus\Registry\ModuleRegistry;
 use WicketPortus\Support\HyperfieldsOptionTransfer;
-use WicketPortus\Support\MembershipConfigContentProfile;
-use WicketPortus\Support\PrivateContentPlusAttachmentsProfile;
 use WicketPortus\Support\WarningPrinter;
 use WicketPortus\Support\WordPressOptionReader;
 
@@ -93,9 +88,6 @@ class Plugin
         add_action('admin_init', [$this, 'maybe_apply_deferred_plugin_changes']);
         add_filter('hyperfields/import/ui_notice_message', [$this, 'filter_portus_import_notice_message'], 10, 3);
         add_filter('hyperfields/import/ui_notice_extra_html', [$this, 'filter_portus_import_notice_extra_html'], 10, 3);
-        MembershipConfigContentProfile::register();
-        PrivateContentPlusAttachmentsProfile::register();
-
         /*
          * Allows extensions to register additional modules.
          *
@@ -118,11 +110,7 @@ class Plugin
          *
          * @param string[] $disabled Module keys to disable.
          */
-        $disabled = apply_filters('wicket_portus_disabled_modules', [
-            'content_pages',
-            'content_my_account',
-            'my_account_pages',
-        ]);
+        $disabled = apply_filters('wicket_portus_disabled_modules', []);
 
         if (!is_array($disabled)) {
             return;
@@ -607,8 +595,6 @@ class Plugin
             'account_centre' => 'Wicket Account Centre',
             'financial_fields' => 'Wicket Financial Fields',
             'site_inventory' => 'Plugin Inventory',
-            'curated_pages' => 'Curated Pages',
-            'my_account_pages' => 'Content: My Account Pages',
             'woocommerce_emails' => 'WooCommerce Emails',
             'developer_wp_options_snapshot' => 'Developer: Full wp_options Snapshot',
             default => ucwords(str_replace('_', ' ', $module_key)),
@@ -670,12 +656,10 @@ class Plugin
         return match ($module_key) {
             'wicket_settings' => 'API credentials and environment settings',
             'site_inventory' => 'Status + version checks',
-            'curated_pages' => 'Curated page list (shop, checkout, etc.)',
-            'my_account_pages' => 'My account page list (dashboard, profile, org, etc.)',
             'woocommerce_emails' => 'All email settings',
             'gravity_forms_wicket_plugin' => 'Slug mapping, pagination, member fields',
-            'memberships' => 'Plugin options + config posts',
-            'account_centre' => 'Plugin options + my-account pages',
+            'memberships' => 'Plugin options',
+            'account_centre' => 'Plugin options',
             'financial_fields' => 'Revenue deferral and finance mapping',
             default => '',
         };
@@ -714,10 +698,6 @@ class Plugin
 
         $this->registry->register(new PluginInventoryModule());
         $this->registry->register(new DeveloperWpOptionsSnapshotModule());
-        $this->registry->register(new PostTypeExportModule('content_pages', 'page'));
-        $this->registry->register(new PostTypeExportModule('content_my_account', 'my-account'));
-        $this->registry->register(new CuratedPagesExportModule('curated_pages'));
-        $this->registry->register(new MyAccountPagesExportModule('my_account_pages'));
         $this->registry->register(new WicketSettingsModule($reader, $transfer));
         $this->registry->register(new WicketMembershipsModule($reader, $transfer));
         $this->registry->register(new WicketGfOptionsModule($reader, $transfer));

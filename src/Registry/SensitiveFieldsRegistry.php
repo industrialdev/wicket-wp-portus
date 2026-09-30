@@ -93,8 +93,6 @@ class SensitiveFieldsRegistry
         'financial_fields' => [],
         'gravity_forms_wicket_plugin' => [],
         'account_centre' => [],
-        'curated_pages' => [],
-        'my_account_pages' => [],
         'woocommerce_emails' => [],
         'site_inventory' => [],
         'memberships' => [
