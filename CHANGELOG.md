@@ -1,3 +1,17 @@
+# Changelog
+
+All notable changes to this plugin are documented in this file.
+This project adheres to [Semantic Versioning](https://semver.org/).
+
+<!-- new releases inserted below this line -->
+
+## [0.1.7] - 2026-09-30
+
+### Fixed
+- **content-transfer:** prune stale references to removed module keys (WWID-2665)
+- **content-transfer:** remove content modules calling dependencies deleted in 2cdcc8d (WWID-2665)
+
+
 # Wicket Portus Changelog
 
 # 0.1.6
