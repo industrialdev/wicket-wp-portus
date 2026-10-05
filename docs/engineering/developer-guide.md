@@ -70,9 +70,6 @@ wicket-wp-portus/
 │   │   ├── WicketGfOptionsModule.php
 │   │   ├── FinancialFieldsModule.php
 │   │   ├── WooCommerceEmailModule.php
-│   │   ├── CuratedPagesExportModule.php
-│   │   ├── MyAccountPagesExportModule.php
-│   │   ├── PostTypeExportModule.php
 │   │   ├── ThemeAcfOptionsModule.php  # Optional — not auto-registered; see Extension Points
 │   │   └── DeveloperWpOptionsSnapshotModule.php
 │   ├── Registry/
@@ -81,9 +78,7 @@ wicket-wp-portus/
 │   └── Support/
 │       ├── HyperfieldsOptionTransfer.php  # Wraps HyperFields option read/write
 │       ├── WordPressOptionReader.php      # Thin wrapper around get_option()
-│       ├── WarningPrinter.php             # Produces admin-notice HTML strings
-│       ├── MembershipConfigContentProfile.php
-│       └── PrivateContentPlusAttachmentsProfile.php
+│       └── WarningPrinter.php             # Produces admin-notice HTML strings
 ├── docs/
 ├── assets/
 └── vendor/
