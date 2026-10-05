@@ -69,7 +69,10 @@ wicket-wp-portus/
 │   │   ├── AccCarbonFieldsOptionsModule.php
 │   │   ├── WicketGfOptionsModule.php
 │   │   ├── FinancialFieldsModule.php
+│   │   ├── MembershipOptionsModule.php
 │   │   ├── WooCommerceEmailModule.php
+│   │   ├── PluginInventoryModule.php
+│   │   ├── WicketSettingsModule.php
 │   │   ├── ThemeAcfOptionsModule.php  # Optional — not auto-registered; see Extension Points
 │   │   └── DeveloperWpOptionsSnapshotModule.php
 │   ├── Registry/
