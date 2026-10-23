@@ -96,7 +96,7 @@ All PHP files: `declare(strict_types=1);`. Namespace root: `WicketPortus\` → `
 
 ## Documentation
 
-Engineering and product documentation lives in the Atlas knowledge base at `@see atlas://packages/wicket-wp-portus.md` (developer guide, manifest reference, product overview). The package docs folder keeps only the public end-user guide. Read `@see atlas://packages/wicket-wp-portus/AGENTS.md` for doc writing rules before authoring Atlas docs for this package.
+Engineering and product documentation for the whole Wicket stack lives in the Atlas knowledge base at `@see atlas://packages/wicket-wp-portus.md` (developer guide, manifest reference, product overview). The package docs folder keeps only the public end-user guide. Read `@see atlas://packages/wicket-wp-portus/AGENTS.md` for doc writing rules before authoring Atlas docs for this package.
 
 ## Release & Branch Workflow
 All work happens on branches. `main` is locked; changes land via peer-reviewed
