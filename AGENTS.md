@@ -47,7 +47,7 @@ Optional interfaces: `SanitizableModuleInterface` (sanitize sensitive fields in 
 
 ### Adding a module
 
-Full worked example in `docs/engineering/add-module-playbook.md`. Key rules:
+Full worked example: `@see atlas://packages/wicket-wp-portus/engineering/add-module-playbook.md`. Key rules:
 
 1. Always validate at the top of `import()` and return early on failure.
 2. Check `$options['dry_run']` — never assume false.
@@ -72,19 +72,7 @@ Plugin activation/deactivation changes from an import are stored in a transient 
 
 ### Manifest envelope
 
-```json
-{
-  "schema_version": 1,
-  "type": "wicket_portus_manifest",
-  "generated_at": "<ISO-8601>",
-  "export_mode": "template|full|developer",
-  "site": { "url": "...", "environment": "..." },
-  "modules": { "<key>": { ... } },
-  "errors": []
-}
-```
-
-Volatile fields excluded from diff: `generated_at`, `errors`, `export_mode`.
+The manifest is a JSON envelope: `schema_version`, `type: wicket_portus_manifest`, `generated_at`, `export_mode` (template|full|developer), `site` (url, environment), `modules` keyed by module key, and `errors`. Volatile fields excluded from diff: `generated_at`, `errors`, `export_mode`. Full reference: `@see atlas://packages/wicket-wp-portus/engineering/manifest-reference.md`.
 
 ## Key Extension Points
 
@@ -108,14 +96,7 @@ All PHP files: `declare(strict_types=1);`. Namespace root: `WicketPortus\` → `
 
 ## Documentation
 
-`docs/AGENTS.md` defines doc writing rules: audiences, directory layout, required frontmatter, content conventions, and index maintenance. Read it before writing or editing any doc in `docs/`.
-
-| Doc | Audience |
-|---|---|
-| `docs/product/` | Implementers & support — WP admin settings |
-| `docs/engineering/` | Developers & agents — hooks, classes, architecture |
-| `docs/guides/` | End users — task-oriented how-tos |
-| `docs/index.md` | Entry point — update when any doc changes |
+Engineering and product documentation for the whole Wicket stack lives in the Atlas knowledge base at `@see atlas://packages/wicket-wp-portus.md` (developer guide, manifest reference, product overview). The package docs folder keeps only the public end-user guide. Read `@see atlas://packages/wicket-wp-portus/AGENTS.md` for doc writing rules before authoring Atlas docs for this package.
 
 ## Release & Branch Workflow
 All work happens on branches. `main` is locked; changes land via peer-reviewed

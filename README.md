@@ -80,6 +80,10 @@ For full architecture, module system, and contribution documentation see **[docs
 
 GPL v2 or later — Developed by [Wicket](https://wicket.io)
 
+## Documentation
+
+End-user guides live in the [docs](docs/) folder. Start with the [Portus End-User Guide](docs/portus-user-guide.md).
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
