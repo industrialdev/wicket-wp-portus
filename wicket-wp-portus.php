@@ -4,7 +4,7 @@
  * Plugin Name: Wicket Portus
  * Plugin URI:  https://wicket.io
  * Description: Makes Wicket site configuration portable, reviewable, and repeatable.
- * Version:     0.1.7
+ * Version:     0.1.8
  * Author:      Wicket Inc.
  * Author URI:  https://wicket.io
  * Text Domain: wicket-portus

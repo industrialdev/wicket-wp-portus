@@ -5,6 +5,23 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [0.1.8] - 2026-11-06
+
+### Added
+- **gf:** export the per-field MDP UUID source property
+
+### Documentation
+- state the atlas knowledge-base rule in AGENTS.md
+- streamline AGENTS.md and point at atlas
+- flatten end-user docs and link from README
+- add three missing modules to the developer guide tree (WWID-2665)
+- drop removed content-transfer modules from the developer guide (WWID-2665)
+
+### Maintenance
+- **docs:** move engineering docs to atlas (A0012)
+- **ci:** fail closed when main moves before release push
+
+
 ## [0.1.7] - 2026-09-30
 
 ### Fixed
