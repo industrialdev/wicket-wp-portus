@@ -36,6 +36,7 @@ class WicketGfOptionsModule implements ConfigModuleInterface
         'wicket_enable_mdp_mapping',
         'wicket_mdp_target_object',
         'wicket_mdp_target_field',
+        'wicket_mdp_uuid_source_field',
         'wicket_field_slug',
     ];
 
