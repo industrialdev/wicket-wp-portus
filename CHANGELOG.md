@@ -5,6 +5,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [0.1.9] - 2026-11-10
+
+### Maintenance
+- **deps:** consume dependencies from wicket-wp-account-centre (WWID-2980)
+
+
 ## [0.1.8] - 2026-11-06
 
 ### Added
