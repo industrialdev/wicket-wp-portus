@@ -31,8 +31,7 @@
   "name": "industrialdev/wicket-wp-portus",
   "prefer-stable": true,
   "require": {
-    "php": ">=8.3",
-    "estebanforge/hyperfields": "^1"
+    "php": ">=8.3"
   },
   "require-dev": {
     "friendsofphp/php-cs-fixer": "^3"
