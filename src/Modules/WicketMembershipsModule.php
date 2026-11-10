@@ -26,6 +26,15 @@ class WicketMembershipsModule implements ConfigModuleInterface
     ];
 
     /**
+     * Sub-keys of the plugin option that never travel between sites.
+     *
+     * `wicket_mship_api_allowed_keys` holds WooCommerce API key IDs. They are auto-increment rows
+     * local to each site, so on another site the same IDs would grant membership API access to
+     * unrelated keys. Merge-mode import leaves the target site's own value in place.
+     */
+    private const SITE_LOCAL_KEYS = ['wicket_mship_api_allowed_keys'];
+
+    /**
      * @param WordPressOptionReader     $reader   WordPress options reader.
      * @param HyperfieldsOptionTransfer $transfer HyperFields transfer adapter.
      */
@@ -50,6 +59,7 @@ class WicketMembershipsModule implements ConfigModuleInterface
         // Export plugin options
         $plugin_options = $this->reader->get(self::OPTION_KEY, []);
         $plugin_options = is_array($plugin_options) ? $plugin_options : [];
+        $plugin_options = array_diff_key($plugin_options, array_flip(self::SITE_LOCAL_KEYS));
 
         return [
             'plugin_options' => $plugin_options,
@@ -88,9 +98,9 @@ class WicketMembershipsModule implements ConfigModuleInterface
             return $result;
         }
 
-        // Import plugin options
+        // Import plugin options. Strip site-local keys too, for manifests exported before they were excluded.
         $option_values = [
-            self::OPTION_KEY => $payload['plugin_options'],
+            self::OPTION_KEY => array_diff_key($payload['plugin_options'], array_flip(self::SITE_LOCAL_KEYS)),
         ];
         foreach (SchemaValidator::validateMap($option_values, self::OPTION_SCHEMA, 'memberships') as $validationError) {
             $result->add_error((string) $validationError);
