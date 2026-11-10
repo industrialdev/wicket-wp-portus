@@ -8,7 +8,9 @@
  * Author:      Wicket Inc.
  * Author URI:  https://wicket.io
  * Text Domain: wicket-portus
+ * Requires at least: 6.6
  * Requires PHP: 8.3.
+ * Requires Plugins: wicket-wp-account-centre
  */
 
 declare(strict_types=1);
@@ -22,9 +24,75 @@ define('WICKET_PORTUS_DIR', plugin_dir_path(__FILE__));
 define('WICKET_PORTUS_URL', plugin_dir_url(__FILE__));
 define('WICKET_PORTUS_FILE', __FILE__);
 
+/*
+|--------------------------------------------------------------------------
+| Dependency: wicket-wp-account-centre
+|--------------------------------------------------------------------------
+|
+| This plugin requires wicket-wp-account-centre to be active. That plugin
+| provides the HyperFields\ namespace (Transfer\Manager, Validation\SchemaValidator)
+| that Portus relies on. This plugin does not vendor the library itself.
+|
+| On activation we abort with a clear message if the dependency is missing.
+| After activation we bail out of the bootstrap and show an admin notice if
+| the dependency is deactivated while Portus is still active.
+|
+*/
+
+if (!function_exists('wicket_portus_check_account_centre_dependency')) {
+    /**
+     * Returns true when wicket-wp-account-centre is active.
+     */
+    function wicket_portus_check_account_centre_dependency(): bool
+    {
+        if (!function_exists('is_plugin_active')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        return is_plugin_active('wicket-wp-account-centre/class-wicket-acc-main.php');
+    }
+}
+
+if (!function_exists('wicket_portus_dependency_missing_notice')) {
+    /**
+     * Renders the admin notice shown when the required plugin is inactive.
+     */
+    function wicket_portus_dependency_missing_notice(): void
+    {
+        echo '<div class="notice notice-error"><p>';
+        echo esc_html__(
+            'Wicket Portus requires the Wicket Account Centre plugin to be installed and activated.',
+            'wicket-portus'
+        );
+        echo '</p></div>';
+    }
+}
+
+register_activation_hook(__FILE__, static function (): void {
+    if (!wicket_portus_check_account_centre_dependency()) {
+        deactivate_plugins(plugin_basename(__FILE__));
+        wp_die(
+            esc_html__(
+                'Wicket Portus requires the Wicket Account Centre plugin to be installed and activated. Please activate it before enabling this plugin.',
+                'wicket-portus'
+            ),
+            esc_html__('Plugin activation failed', 'wicket-portus'),
+            ['back_link' => true]
+        );
+    }
+});
+
 add_action(
     'plugins_loaded',
-    [Wicket_Portus_Bootstrap::get_instance(), 'plugin_setup'],
+    static function (): void {
+        if (!wicket_portus_check_account_centre_dependency()) {
+            add_action('admin_notices', 'wicket_portus_dependency_missing_notice');
+
+            return;
+        }
+
+        Wicket_Portus_Bootstrap::get_instance()->plugin_setup();
+    },
     99
 );
 

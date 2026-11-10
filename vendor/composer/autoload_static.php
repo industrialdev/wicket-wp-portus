@@ -6,18 +6,10 @@ namespace Composer\Autoload;
 
 class ComposerStaticInitb4f3828c0666841b6fe71a826549a7c2
 {
-    public static $files = array (
-        'c1c635284e1ca7836efff979fb09390f' => __DIR__ . '/..' . '/estebanforge/hyperfields/bootstrap.php',
-    );
-
     public static $prefixLengthsPsr4 = array (
         'W' =>
         array (
             'WicketPortus\\' => 13,
-        ),
-        'H' =>
-        array (
-            'HyperFields\\' => 12,
         ),
     );
 
@@ -26,65 +18,10 @@ class ComposerStaticInitb4f3828c0666841b6fe71a826549a7c2
         array (
             0 => __DIR__ . '/../..' . '/src',
         ),
-        'HyperFields\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/estebanforge/hyperfields/src',
-        ),
     );
 
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
-        'HyperFields\\AdminPage' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/AdminPage.php',
-        'HyperFields\\Admin\\Activation' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Admin/Activation.php',
-        'HyperFields\\Admin\\ExportImportPageConfig' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Admin/ExportImportPageConfig.php',
-        'HyperFields\\Admin\\ExportImportUI' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Admin/ExportImportUI.php',
-        'HyperFields\\Admin\\TransferLogsUI' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Admin/TransferLogsUI.php',
-        'HyperFields\\Assets' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Assets.php',
-        'HyperFields\\BlockFieldAdapter' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/BlockFieldAdapter.php',
-        'HyperFields\\CacheInvalidator' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/CacheInvalidator.php',
-        'HyperFields\\Compatibility\\CompatibilityMigrator' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/CompatibilityMigrator.php',
-        'HyperFields\\Compatibility\\OptionTypeRegistry' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/OptionTypeRegistry.php',
-        'HyperFields\\Compatibility\\SectionProxy' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/SectionProxy.php',
-        'HyperFields\\Compatibility\\SettingsCompatibility' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/SettingsCompatibility.php',
-        'HyperFields\\Compatibility\\Store\\ArrayOptionStore' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/Store/ArrayOptionStore.php',
-        'HyperFields\\Compatibility\\Store\\DualWriteStore' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/Store/DualWriteStore.php',
-        'HyperFields\\Compatibility\\Store\\FallbackReadStore' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/Store/FallbackReadStore.php',
-        'HyperFields\\Compatibility\\Store\\SingleOptionStore' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/Store/SingleOptionStore.php',
-        'HyperFields\\Compatibility\\Store\\StoreInterface' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/Store/StoreInterface.php',
-        'HyperFields\\Compatibility\\TabProxy' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/TabProxy.php',
-        'HyperFields\\Compatibility\\WPSettingsCompatibility' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Compatibility/WPSettingsCompatibility.php',
-        'HyperFields\\ConditionalLogic' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/ConditionalLogic.php',
-        'HyperFields\\Config' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Config.php',
-        'HyperFields\\Container\\Container' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/Container.php',
-        'HyperFields\\Container\\ContainerFactory' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/ContainerFactory.php',
-        'HyperFields\\Container\\PostMetaContainer' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/PostMetaContainer.php',
-        'HyperFields\\Container\\TermMetaContainer' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/TermMetaContainer.php',
-        'HyperFields\\Container\\UserMetaContainer' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/UserMetaContainer.php',
-        'HyperFields\\CustomField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/CustomField.php',
-        'HyperFields\\ExportImport' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/ExportImport.php',
-        'HyperFields\\Field' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Field.php',
-        'HyperFields\\HeadingField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/HeadingField.php',
-        'HyperFields\\HyperFields' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/HyperFields.php',
-        'HyperFields\\LibraryBootstrap' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/LibraryBootstrap.php',
-        'HyperFields\\Log' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Log.php',
-        'HyperFields\\OptionField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/OptionField.php',
-        'HyperFields\\OptionsPage' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/OptionsPage.php',
-        'HyperFields\\OptionsSection' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/OptionsSection.php',
-        'HyperFields\\PostField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/PostField.php',
-        'HyperFields\\ReactField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/ReactField.php',
-        'HyperFields\\Registry' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Registry.php',
-        'HyperFields\\RepeaterField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/RepeaterField.php',
-        'HyperFields\\SeparatorField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/SeparatorField.php',
-        'HyperFields\\TabsField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/TabsField.php',
-        'HyperFields\\TemplateLoader' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/TemplateLoader.php',
-        'HyperFields\\TermField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/TermField.php',
-        'HyperFields\\Transfer\\AuditContext' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Transfer/AuditContext.php',
-        'HyperFields\\Transfer\\AuditLogStorage' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Transfer/AuditLogStorage.php',
-        'HyperFields\\Transfer\\AuditLogger' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Transfer/AuditLogger.php',
-        'HyperFields\\Transfer\\Manager' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Transfer/Manager.php',
-        'HyperFields\\Transfer\\SchemaConfig' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Transfer/SchemaConfig.php',
-        'HyperFields\\UserField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/UserField.php',
-        'HyperFields\\Validation\\SchemaValidator' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Validation/SchemaValidator.php',
         'WicketPortus\\Access\\DomainGatekeeper' => __DIR__ . '/../..' . '/src/Access/DomainGatekeeper.php',
         'WicketPortus\\Contracts\\ConfigModuleInterface' => __DIR__ . '/../..' . '/src/Contracts/ConfigModuleInterface.php',
         'WicketPortus\\Contracts\\OptionGroupProviderInterface' => __DIR__ . '/../..' . '/src/Contracts/OptionGroupProviderInterface.php',
@@ -92,13 +29,10 @@ class ComposerStaticInitb4f3828c0666841b6fe71a826549a7c2
         'WicketPortus\\Manifest\\ImportResult' => __DIR__ . '/../..' . '/src/Manifest/ImportResult.php',
         'WicketPortus\\Manifest\\TransferOrchestrator' => __DIR__ . '/../..' . '/src/Manifest/TransferOrchestrator.php',
         'WicketPortus\\Modules\\AccCarbonFieldsOptionsModule' => __DIR__ . '/../..' . '/src/Modules/AccCarbonFieldsOptionsModule.php',
-        'WicketPortus\\Modules\\CuratedPagesExportModule' => __DIR__ . '/../..' . '/src/Modules/CuratedPagesExportModule.php',
         'WicketPortus\\Modules\\DeveloperWpOptionsSnapshotModule' => __DIR__ . '/../..' . '/src/Modules/DeveloperWpOptionsSnapshotModule.php',
         'WicketPortus\\Modules\\FinancialFieldsModule' => __DIR__ . '/../..' . '/src/Modules/FinancialFieldsModule.php',
         'WicketPortus\\Modules\\MembershipOptionsModule' => __DIR__ . '/../..' . '/src/Modules/MembershipOptionsModule.php',
-        'WicketPortus\\Modules\\MyAccountPagesExportModule' => __DIR__ . '/../..' . '/src/Modules/MyAccountPagesExportModule.php',
         'WicketPortus\\Modules\\PluginInventoryModule' => __DIR__ . '/../..' . '/src/Modules/PluginInventoryModule.php',
-        'WicketPortus\\Modules\\PostTypeExportModule' => __DIR__ . '/../..' . '/src/Modules/PostTypeExportModule.php',
         'WicketPortus\\Modules\\ThemeAcfOptionsModule' => __DIR__ . '/../..' . '/src/Modules/ThemeAcfOptionsModule.php',
         'WicketPortus\\Modules\\WicketGfOptionsModule' => __DIR__ . '/../..' . '/src/Modules/WicketGfOptionsModule.php',
         'WicketPortus\\Modules\\WicketMembershipsModule' => __DIR__ . '/../..' . '/src/Modules/WicketMembershipsModule.php',
@@ -108,8 +42,6 @@ class ComposerStaticInitb4f3828c0666841b6fe71a826549a7c2
         'WicketPortus\\Registry\\ModuleRegistry' => __DIR__ . '/../..' . '/src/Registry/ModuleRegistry.php',
         'WicketPortus\\Registry\\SensitiveFieldsRegistry' => __DIR__ . '/../..' . '/src/Registry/SensitiveFieldsRegistry.php',
         'WicketPortus\\Support\\HyperfieldsOptionTransfer' => __DIR__ . '/../..' . '/src/Support/HyperfieldsOptionTransfer.php',
-        'WicketPortus\\Support\\MembershipConfigContentProfile' => __DIR__ . '/../..' . '/src/Support/MembershipConfigContentProfile.php',
-        'WicketPortus\\Support\\PrivateContentPlusAttachmentsProfile' => __DIR__ . '/../..' . '/src/Support/PrivateContentPlusAttachmentsProfile.php',
         'WicketPortus\\Support\\WarningPrinter' => __DIR__ . '/../..' . '/src/Support/WarningPrinter.php',
         'WicketPortus\\Support\\WordPressOptionReader' => __DIR__ . '/../..' . '/src/Support/WordPressOptionReader.php',
     );
