@@ -5,6 +5,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [0.1.10] - 2026-11-11
+
+### Fixed
+- **memberships:** keep WooCommerce API key allowlist out of Portus transfers (WWID-2082)
+
+
 ## [0.1.9] - 2026-11-10
 
 ### Maintenance
